@@ -1,0 +1,265 @@
+/* ICEbreaker — phosphor HUD. Bright green, double borders, amber accents.
+   Tuned to glow under cool-retro-term. */
+
+Screen {
+    background: #03110a;
+    color: #33ff66;
+}
+
+/* ---- top bar -------------------------------------------------------- */
+#topbar {
+    height: 1;
+    background: #07180c;
+    color: #4dff88;
+    text-style: bold;
+    padding: 0 1;
+}
+
+/* ---- main panes (HUD: list | detail | wintermute) ------------------- */
+#panes { height: 1fr; }
+
+#left {
+    width: 30%;
+    min-width: 32;
+    border: double #1f9e46;
+    border-title-color: #33ff88;
+    border-title-style: bold;
+}
+#center {
+    width: 1fr;
+    border: double #1f9e46;
+    border-title-color: #ffb000;
+    border-title-style: bold;
+    padding: 0 1;
+}
+#wm {
+    width: 32%;
+    min-width: 30;
+    border: double #1f9e46;
+    border-title-color: #33ff88;
+    border-title-style: bold;
+    padding: 0 1;
+}
+#wm.hidden { display: none; }
+
+/* bright border on the focused pane */
+#left:focus-within, #center:focus, #center:focus-within, #wm:focus-within {
+    border: double #33ff66;
+}
+
+DataTable {
+    background: #03110a;
+    color: #33ff66;
+    scrollbar-color: #1f9e46 #03110a;
+    scrollbar-size: 1 1;
+}
+DataTable > .datatable--cursor {
+    background: #103018;
+    color: #aaffcc;
+    text-style: bold;
+}
+DataTable > .datatable--header {
+    background: #07180c;
+    color: #2bbf5a;
+    text-style: bold;
+}
+DataTable > .datatable--hover { background: #07180c; }
+
+#detail { height: 1fr; background: #03110a; color: #33ff66; }
+
+/* ---- wintermute pane ------------------------------------------------ */
+#wm-log { height: 1fr; background: #03110a; }
+#wm-input { height: 5; border: tall #1f9e46; background: #07180c; color: #cfffe0; }
+#wm-input:focus { border: tall #33ff66; }
+
+/* ---- footer / status ------------------------------------------------ */
+#statusbar {
+    height: 1;
+    background: #07180c;
+    color: #2bbf5a;
+    padding: 0 1;
+}
+Footer { background: #07180c; color: #2bbf5a; }
+Footer > .footer--key { background: #103018; color: #4dff88; text-style: bold; }
+Footer > .footer--description { color: #33ff66; }
+
+/* ---- modals --------------------------------------------------------- */
+ModalScreen { align: center middle; }
+.modal { align: center middle; background: #03110a 70%; }
+
+#modal-box {
+    width: 80;
+    max-width: 92%;
+    height: auto;
+    max-height: 82%;
+    border: double #33ff66;
+    background: #04150a;
+    padding: 1 2;
+}
+#modal-box.amber { border: double #ffb000; }
+.modal-title { color: #ffb000; text-style: bold; width: 100%; text-align: center; }
+.modal-help { color: #33ff66; }
+
+#splash-box {
+    width: 84;
+    max-width: 96%;
+    height: auto;
+    background: transparent;
+    color: #33ff66;
+    padding: 1 2;
+    align: center middle;
+}
+
+/* ---- full-screen chat (still available via fullscreen) -------------- */
+#chat-box {
+    width: 92; max-width: 96%; height: 82%;
+    border: double #33ff66; background: #04150a; padding: 0 1;
+}
+#chat-log { height: 1fr; background: #03110a; }
+#chat-input { height: 6; border: tall #1f9e46; background: #07180c; color: #cfffe0; }
+#chat-input:focus { border: tall #33ff66; }
+
+/* ---- zoom (pop-out) modals ----------------------------------------- */
+#zoom-box {
+    width: 96%;
+    height: 92%;
+    border: double #33ff66;
+    background: #04150a;
+    padding: 1 2;
+}
+#zoomtable { height: 1fr; background: #03110a; color: #33ff66; }
+
+Input { background: #07180c; color: #aaffcc; border: tall #1f9e46; }
+Input:focus { border: tall #33ff66; }
+TextArea { background: #07180c; color: #cfffe0; border: tall #1f9e46; }
+TextArea:focus { border: tall #33ff66; }
+
+/* ---- retro BBS buttons --------------------------------------------- */
+Button {
+    width: 100%;
+    height: 3;
+    margin: 0 0 1 0;
+    background: #08220f;
+    color: #33ff66;
+    border: tall #1f9e46;
+    text-style: bold;
+    content-align: left middle;
+}
+Button:focus {
+    background: #103018;
+    color: #ffd45a;
+    border: tall #ffb000;
+}
+Button:hover { background: #0d2a14; }
+Button.-active { background: #143d1e; }
+
+/* ---- kanban (v1.4.0: dedicated board, wide scrollable gridlined cols) */
+#board { height: 1fr; overflow-x: auto; }
+.kcol {
+    min-width: 36;
+    width: 1fr;
+    border: double #1f9e46;
+    background: #03110a;
+    color: #33ff66;
+    padding: 0;
+}
+.kcol-active { border: double #33ff66; }
+.kcol-head { height: 1; background: #07180c; }
+.kcol-list { height: 1fr; scrollbar-size: 1 1; scrollbar-color: #1f9e46 #03110a; }
+.kcard { height: auto; padding: 0 1; border-bottom: solid #0d3a1c; }
+.kcard-sel { background: #102810; }
+.kcard-empty { padding: 0 1; }
+
+/* ---- help / connections / launcher / cv / me / models boxes -------- */
+#help-box, #conn-box, #menu-box, #cv-box, #me-box, #models-box {
+    width: 92;
+    max-width: 95%;
+    height: auto;
+    max-height: 88%;
+    border: double #33ff66;
+    background: #04150a;
+    padding: 1 2;
+    align: center middle;
+}
+#me-box { width: 100; height: 86%; }
+#me-editor { height: 1fr; min-height: 16; }
+#conn-box { height: 90%; }
+#conn-fields { height: 1fr; min-height: 8; }
+/* Compact menu rows so all entries fit even on short windows. */
+#menu-buttons { height: auto; width: 1fr; }
+#menu-buttons Button {
+    height: 1;
+    margin: 0;
+    border: none;
+    background: #04150a;
+    color: #33ff66;
+    content-align: left middle;
+}
+#menu-buttons Button:focus {
+    background: #103018;
+    color: #ffd45a;
+    text-style: bold;
+}
+#menu-buttons Button:hover { background: #0d2a14; }
+#conn-box Input, #cv-box Input { margin: 0 0 1 0; }
+
+/* ---- apify actors screen ------------------------------------------- */
+#apify-box {
+    width: 96;
+    max-width: 96%;
+    height: 90%;
+    border: double #33ff66;
+    background: #04150a;
+    padding: 1 2;
+}
+#ap-list { height: auto; max-height: 10; border: round #1f9e46; padding: 0 1; margin: 0 0 1 0; }
+#ap-list Button { width: 100%; height: 1; border: none; background: #04150a; color: #ff8a8a; content-align: left middle; margin: 0; }
+#ap-list Button:focus { background: #2a0d0d; color: #ffb0b0; }
+#ap-input { height: 6; }
+#ap-buttons { height: 3; }
+#ap-buttons Button { width: 1fr; margin: 0 1 0 0; }
+
+/* ---- boards (greenhouse / lever) manager --------------------------- */
+#boards-box {
+    width: 100;
+    max-width: 96%;
+    height: 90%;
+    border: double #33ff66;
+    background: #04150a;
+    padding: 1 2;
+}
+#boards-cols { height: 1fr; }
+.board-col { width: 1fr; border: round #1f9e46; padding: 0 1; margin: 0 1 0 0; }
+#greenhouse-list, #lever-list { height: 1fr; border: round #0d3a1c; margin: 0 0 1 0; }
+.board-col Static#greenhouse-head, .board-col Static#lever-head { color: #33ff88; text-style: bold; }
+#greenhouse-list Button, #lever-list Button {
+    width: 100%; height: 1; border: none; margin: 0;
+    background: #04150a; color: #ff8a8a; content-align: left middle;
+}
+#greenhouse-list Button:focus, #lever-list Button:focus { background: #2a0d0d; color: #ffb0b0; }
+.board-col Input { margin: 0 0 1 0; }
+.board-col Button { height: 3; }
+
+/* ---- filters (search) screen --------------------------------------- */
+#filters-box {
+    width: 104; max-width: 96%; height: 92%;
+    border: double #33ff66; background: #04150a; padding: 1 2;
+}
+#filters-scroll { height: 1fr; }
+#filters-cols {
+    layout: grid; grid-size: 2; grid-columns: 1fr; grid-rows: auto;
+    height: auto; grid-gutter: 0 1;
+}
+.fcol { width: 1fr; height: auto; padding: 0 1 0 0; }
+.fcol SelectionList { height: 8; border: round #1f9e46; background: #07180c; }
+#filters-selects {
+    layout: grid; grid-size: 2; grid-columns: 1fr; grid-rows: auto;
+    height: auto; grid-gutter: 0 1;
+}
+RadioSet { background: #07180c; border: round #1f9e46; height: auto; width: 1fr; }
+RadioButton { color: #33ff66; }
+RadioSet > RadioButton.-selected { background: #103018; }
+#filters-buttons { height: 3; }
+#filters-buttons Button { width: 1fr; margin: 0 1 0 0; }
+SelectionList { color: #33ff66; }
+SelectionList > .selection-list--option-highlighted { background: #103018; }

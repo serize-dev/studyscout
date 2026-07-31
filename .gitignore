@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+*.spec.bak
+profile.toml
+site.md
+*.db
+PUBLISH.md
+linkedin-draft.md
+docs/private/
