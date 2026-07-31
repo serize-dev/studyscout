@@ -12,6 +12,20 @@ unit is the relationship, not the NCT number.
 
 Built by a clinician who runs site BD, for people who do the job.
 
+![The sponsor dossier — the thesis in one screen](docs/dossier.png)
+
+<details>
+<summary>More screens — the deck and the sponsor lens</summary>
+
+![The deck](docs/main.png)
+
+![Sponsors — the BD lens](docs/sponsors.png)
+
+</details>
+
+*(Screens above are the test-fixture data the smoke suite generates — no real
+sponsors were harmed.)*
+
 ## What it does
 
 - **Hunt** — ClinicalTrials.gov v2 API (public, keyless): condition, keyword
