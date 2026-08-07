@@ -56,7 +56,7 @@ HELP_TEXT = """\
   [#33ff66]F1[/]  this help        [#33ff66]q[/]  quit
 
 [dim]@ = a direct contact (email/phone) is listed.   SITE count: multi-site (≥2) = better odds.[/]
-[dim]In chat: ctrl+u folds the conversation into your site profile (site.md).[/]"""
+[dim]In chat: ctrl+e folds the conversation into an outreach email · ctrl+u into your site profile (site.md).[/]"""
 
 
 class HelpModal(ModalScreen):

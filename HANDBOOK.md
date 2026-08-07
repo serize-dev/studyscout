@@ -74,6 +74,12 @@ the whole ocean — `studyscout doctor` will call it out.
   (THE COMPANY / FRESH SIGNALS / WHO TO REACH / THE ANGLE). It's stored, shown
   in the dossier view, and automatically fed into the `m` pitch. Uses tokens +
   live search; runs only when you press it. Anthropic provider only.
+- **`ctrl+e` in chat — fold the conversation into an email** (v1.5.3): the `m`
+  draft starts cold from the study; this one starts from the chat. Refine the
+  angle with Wintermute — hooks, wording, tone — then `ctrl+e` produces the
+  final email *as agreed in the conversation*, in the same draft modal
+  (`c` copy · `o` open in mail). Where the chat and the default email rules
+  disagree, the chat wins. Works in the side pane and the full screen (`c`).
 - **`b` — morning briefing:** what changed since yesterday (deltas), sponsors
   gone quiet (`followup.nudge_days`), and today's top three.
 - **`R` — reg handoff:** after a WIN, the CDA→SIV paperwork checklist

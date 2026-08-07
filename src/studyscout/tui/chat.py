@@ -28,7 +28,7 @@ class ChatScreen(ModalScreen):
             ctx = f"WINTERMUTE  ·  {self.study.nct}" if self.study else "WINTERMUTE"
             yield Static(Text.from_markup(f"[#ffb000 b]{ctx}[/]"), classes="modal-title")
             yield RichLog(id="chat-log", wrap=True, markup=True, highlight=False)
-            yield ChatInput(placeholder="ask Wintermute…  (enter sends · ctrl+j newline · ctrl+u update site · esc)",
+            yield ChatInput(placeholder="ask Wintermute…  (enter sends · ctrl+j newline · ctrl+e email · ctrl+u update site · esc)",
                             id="chat-input")
 
     def on_mount(self) -> None:
@@ -82,6 +82,29 @@ class ChatScreen(ModalScreen):
 
     def on_chat_input_revise(self, event: ChatInput.Revise) -> None:
         self._revise()
+
+    def on_chat_input_compose(self, event: ChatInput.Compose) -> None:
+        self._compose_email()
+
+    @work(exclusive=True)
+    async def _compose_email(self) -> None:
+        from .modals import TextModal
+        log = self.query_one("#chat-log", RichLog)
+        if not self.consigliere.enabled or not self.history:
+            log.write(Text.from_markup("[#ffb000]Chat first, then Ctrl+E to fold it into an email.[/]"))
+            return
+        log.write(Text.from_markup("[dim]folding the conversation into an email…[/]"))
+        try:
+            draft = await self.consigliere.email_from_chat(self.history, self.study, self.notes)
+        except Exception as exc:  # noqa: BLE001
+            log.write(Text.from_markup(f"[red]couldn't draft:[/] {exc}"))
+            return
+        to = self.study.best_contact().email if self.study else None
+        subject = f"Site interest — {self.study.nct}" if self.study else "Site outreach"
+        mail_ctx = (to, subject, self.consigliere.cfg.get("ui.mail_command", ""))
+        title = f"OUTREACH · {self.study.nct}" if self.study else "OUTREACH · from chat"
+        self.app.push_screen(TextModal(title, draft, amber=True, copyable=True, mail=mail_ctx))
+        log.write(Text.from_markup("[#33ff88 b]draft ready[/] [dim]· c copy · o open in mail[/]"))
 
     @work(exclusive=True)
     async def _revise(self) -> None:

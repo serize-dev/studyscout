@@ -37,7 +37,7 @@ class WintermutePane(Vertical):
             log.write(Text.from_markup(
                 "[#33ff88 b]wintermute>[/] deck's warm. select a study — I'll size up the fit for your "
                 "site, draft the outreach, or prep your pitch.  "
-                "[dim](c = full screen · ctrl+u = update your site profile from this chat)[/]"))
+                "[dim](c = full screen · ctrl+e = fold chat into an email · ctrl+u = update site profile)[/]"))
 
     def _ctx_line(self) -> Text:
         if self.study:
@@ -93,6 +93,29 @@ class WintermutePane(Vertical):
 
     def on_chat_input_revise(self, event: ChatInput.Revise) -> None:
         self._revise()
+
+    def on_chat_input_compose(self, event: ChatInput.Compose) -> None:
+        self._compose_email()
+
+    @work(exclusive=True)
+    async def _compose_email(self) -> None:
+        from .modals import TextModal
+        log = self.query_one("#wm-log", RichLog)
+        if not self.consigliere.enabled or not self.history:
+            log.write(Text.from_markup("[#ffb000]Chat first, then Ctrl+E to fold it into an email.[/]"))
+            return
+        log.write(Text.from_markup("[dim]folding the conversation into an email…[/]"))
+        try:
+            draft = await self.consigliere.email_from_chat(self.history, self.study, self.notes)
+        except Exception as exc:  # noqa: BLE001
+            log.write(Text.from_markup(f"[red]couldn't draft:[/] {exc}"))
+            return
+        to = self.study.best_contact().email if self.study else None
+        subject = f"Site interest — {self.study.nct}" if self.study else "Site outreach"
+        mail_ctx = (to, subject, self.consigliere.cfg.get("ui.mail_command", ""))
+        title = f"OUTREACH · {self.study.nct}" if self.study else "OUTREACH · from chat"
+        self.app.push_screen(TextModal(title, draft, amber=True, copyable=True, mail=mail_ctx))
+        log.write(Text.from_markup("[#33ff88 b]draft ready[/] [dim]· c copy · o open in mail[/]"))
 
     @work(exclusive=True)
     async def _revise(self) -> None:

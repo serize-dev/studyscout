@@ -281,6 +281,31 @@ async def main() -> None:
         await pilot.press("escape"); await pilot.pause(0.2)
         assert isinstance(app.screen, MainScreen)
 
+        # v1.5.3 — ctrl+e in WM chat folds the conversation into an email draft
+        CANNED_EMAIL = ("Subject: Site interest — the refined angle\n\n"
+                        "Dr. X — exactly the hook we sharpened in chat.")
+
+        async def fake_email(self, system, user, *, model=None, max_tokens=None, history=None):
+            stable = system[0]["text"] if isinstance(system, list) else system
+            assert "the conversation wins" in stable       # chat outranks the defaults
+            assert "sharpen the hook" in user              # history rode the wire
+            return CANNED_EMAIL
+        wm = app.screen.wm_pane
+        assert wm is not None
+        wm.history.extend([
+            {"role": "user", "content": "let's sharpen the hook for the sponsor"},
+            {"role": "assistant", "content": "lead with the census, drop the boilerplate"},
+        ])
+        with mock.patch.object(Brain, "complete", fake_email), \
+             mock.patch.object(Brain, "enabled", property(lambda self: True)):
+            wm.on_chat_input_compose(None); await pilot.pause(0.5)
+        assert isinstance(app.screen, TextModal), type(app.screen).__name__
+        assert "refined angle" in app.screen._body
+        app.save_screenshot("/tmp/sf_chatmail.svg")
+        await pilot.press("escape"); await pilot.pause(0.2)
+        assert isinstance(app.screen, MainScreen)
+        wm.history.clear()
+
         # MODELS: provider radio rebuilds the model radio list live
         from studyscout.tui.models_screen import CATALOG, ModelsScreen
         msn = ModelsScreen(eng)

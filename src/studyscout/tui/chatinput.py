@@ -18,6 +18,9 @@ class ChatInput(TextArea):
     class Revise(Message):
         """Ctrl+U — ask Wintermute to update me.md from the conversation."""
 
+    class Compose(Message):
+        """Ctrl+E — fold the conversation's refinements into an outreach email."""
+
     def __init__(self, placeholder: str = "", **kwargs):
         super().__init__("", soft_wrap=True, **kwargs)
         self.show_line_numbers = False
@@ -39,3 +42,7 @@ class ChatInput(TextArea):
             event.prevent_default()
             event.stop()
             self.post_message(self.Revise())
+        elif event.key == "ctrl+e":
+            event.prevent_default()
+            event.stop()
+            self.post_message(self.Compose())

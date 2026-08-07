@@ -147,6 +147,26 @@ class Consigliere:
             system_blocks(stable, volatile), "Write the outreach email now.",
             model=self.brain.model, max_tokens=1200)
 
+    async def email_from_chat(self, history: list[dict], study: Optional[Study] = None,
+                              notes: str = "") -> str:
+        """Ctrl+E — fold the chat's refinements into the final outreach email.
+
+        The 'm' draft starts from the study alone; this one starts from the
+        conversation — angle, wording, and corrections agreed with Wintermute
+        carry over and OUTRANK the default email instructions.
+        """
+        site = load_site(self.cfg)
+        stable = (EMAIL_SYSTEM + ("\n\nOUR SITE PROFILE:\n" + site if site else "")
+                  + "\n\nThe operator has been refining the outreach in the conversation "
+                    "below — strategy, hooks, phrasing, tone. The email must reflect what "
+                    "was agreed there; where the conversation and the instructions above "
+                    "disagree, the conversation wins.")
+        convo = "\n".join(f"{m['role']}: {m['content']}" for m in history[-40:])
+        return await self.brain.complete(
+            system_blocks(stable, _study_context(study, notes)),
+            "Conversation:\n" + convo + "\n\nWrite the final outreach email now.",
+            model=self.brain.model, max_tokens=1200)
+
     async def sponsor_outreach(self, dossier: SponsorDossier,
                                outreach_ctx: str = "") -> str:
         """The consolidated multi-trial pitch — one email per relationship."""
