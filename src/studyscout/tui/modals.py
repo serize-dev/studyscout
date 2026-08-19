@@ -25,14 +25,16 @@ HELP_TEXT = """\
   [#33ff66]a[/]           show / hide stale rows (inbox studies the latest search didn't catch)
   [#33ff66]S[/]           SPONSORS — the dossier view: one row per relationship
   [#33ff66]K[/]           PIPELINE BOARD — worked stages only (also in the menu);
-              on the board: [#33ff66]0/u[/] sends a card back to the inbox (off the board)
+              on the board: [#33ff66]0/u[/] sends a card back to the inbox (off the board);
+              [#33ff66]p[/] prints the column · [#33ff66]P[/] the whole board (saved as a text file too)
   [#33ff66]g / esc[/]     menu — filters · connections · models · site  (esc again quits)
 
 [b #ffb000]PIPELINE   (set the selected study's stage)[/]
   [#33ff66]1[/] flagged  [#33ff66]2[/] contacted  [#33ff66]3[/] waiting  [#33ff66]4[/] replied
-  [#33ff66]5[/] meeting  [#33ff66]6[/] won  [#33ff66]9[/] future outreach  [#33ff66]7[/] declined  [#33ff66]8[/] closed  [#33ff66]0[/] inbox
+  [#33ff66]5[/] meeting  [#33ff66]6[/] won  [#33ff66]9[/] future outreach  [#33ff66]7[/] declined  [#33ff66]x[/] not accepting  [#33ff66]8[/] closed  [#33ff66]0[/] inbox
   [dim]9 = relationship warm, "call us for the next study" — the briefing nags you
-  when a FUTURE sponsor has been parked past followup.future_nudge_days (45d).[/]
+  when a FUTURE sponsor has been parked past followup.future_nudge_days (45d).
+  x = study not accepting new sites (never got in) · 8 = closed: WE ran it, study over.[/]
 
 [b #ffb000]ACTIONS[/]
   [#33ff66]b[/]   morning briefing — new trials · status flips · quiet sponsors · top 3
@@ -56,7 +58,10 @@ HELP_TEXT = """\
   [#33ff66]F1[/]  this help        [#33ff66]q[/]  quit
 
 [dim]@ = a direct contact (email/phone) is listed.   SITE count: multi-site (≥2) = better odds.[/]
-[dim]In chat: ctrl+e folds the conversation into an outreach email · ctrl+u into your site profile (site.md).[/]"""
+[dim]In chat: ctrl+e folds the conversation into an outreach email · ctrl+u into your site profile
+(site.md) — both work with the focus anywhere, not just inside the input.
+Mail: `o` on a draft honors ui.mail_mode — "mailto" (default) or "outlook" (Outlook Web
+compose in the browser, the route for O365/Prospect Mail shops).[/]"""
 
 
 class HelpModal(ModalScreen):
@@ -113,9 +118,9 @@ class TextModal(ModalScreen):
         if not self._mail:
             return
         from ..mail import open_mail, split_draft
-        to_addr, subject_fallback, command = (self._mail + (None, None, ""))[:3]
+        to_addr, subject_fallback, command, mode = (self._mail + (None, None, "", "mailto"))[:4]
         subject, body = split_draft(self._body, subject_fallback or "")
-        ok, msg = open_mail(to_addr, subject, body, command or "")
+        ok, msg = open_mail(to_addr, subject, body, command or "", mode or "mailto")
         self.notify(msg, severity="information" if ok else "warning")
 
 

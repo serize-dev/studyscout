@@ -290,7 +290,8 @@ class SponsorScreen(Screen):
             self.flash(f"draft failed: {exc}", "#ff5555")
             return
         to = next((c.email for c in d.contacts() if c.email), None)
-        mail_ctx = (to, f"Site interest — {d.name}", self.engine.cfg.get("ui.mail_command", ""))
+        mail_ctx = (to, f"Site interest — {d.name}", self.engine.cfg.get("ui.mail_command", ""),
+                    self.engine.cfg.get("ui.mail_mode", "mailto"))
         self.app.push_screen(TextModal(f"PITCH · {d.name[:36]}", draft, amber=True,
                                        copyable=True, mail=mail_ctx))
         self.flash("pitch ready · c copy · o open in mail")

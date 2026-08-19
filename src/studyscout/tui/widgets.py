@@ -10,7 +10,7 @@ STAGE_COLOR = {
     Stage.NEW: "#1f9e46", Stage.FLAGGED: "#ffb000", Stage.CONTACTED: "#33ccff",
     Stage.WAITING: "#c0a000", Stage.REPLIED: "#33ff88", Stage.MEETING: "#ff66cc",
     Stage.WON: "#00ff88", Stage.FUTURE: "#b58cff", Stage.DECLINED: "#ff5555",
-    Stage.CLOSED: "#555555",
+    Stage.UNAVAILABLE: "#8899aa", Stage.CLOSED: "#555555",
 }
 
 _STATUS_SHORT = {

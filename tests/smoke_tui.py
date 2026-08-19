@@ -306,6 +306,63 @@ async def main() -> None:
         assert isinstance(app.screen, MainScreen)
         wm.history.clear()
 
+        # v1.6.0 — ctrl+e fires with the focus ANYWHERE (log / deck), not just
+        # inside the chat input (the v1.5.1 focus lesson, chat edition)
+        wm.history.extend([
+            {"role": "user", "content": "let's sharpen the hook for the sponsor"},
+            {"role": "assistant", "content": "lead with the census, drop the boilerplate"},
+        ])
+        with mock.patch.object(Brain, "complete", fake_email), \
+             mock.patch.object(Brain, "enabled", property(lambda self: True)):
+            app.screen.query_one("#wm-log").focus(); await pilot.pause(0.1)
+            await pilot.press("ctrl+e"); await pilot.pause(0.5)     # from the LOG
+            assert isinstance(app.screen, TextModal), type(app.screen).__name__
+            await pilot.press("escape"); await pilot.pause(0.2)
+            app.screen.query_one("#listings").focus(); await pilot.pause(0.1)
+            await pilot.press("ctrl+e"); await pilot.pause(0.5)     # from the DECK
+            assert isinstance(app.screen, TextModal), type(app.screen).__name__
+            # the draft modal carries the 4-tuple mail ctx (mode included)
+            assert len(app.screen._mail) == 4, app.screen._mail
+            await pilot.press("escape"); await pilot.pause(0.2)
+        wm.history.clear()
+        assert isinstance(app.screen, MainScreen)
+
+        # v1.6.0 — x = NOT ACCEPTING: sinks on the deck, owns a board column
+        scr = app.screen
+        assert Stage.UNAVAILABLE in BOARD_ORDER
+        scr.query_one("#listings").focus(); await pilot.pause(0.1)
+        scr.query_one("#listings").move_cursor(row=0); await pilot.pause(0.1)
+        parked_id = scr.current_id
+        await pilot.press("x"); await pilot.pause(0.2)
+        assert scr.by_id[parked_id][1] == Stage.UNAVAILABLE
+        assert scr.view[-1][0].id == parked_id          # dead-sink to the bottom
+        await pilot.press("K"); await pilot.pause(0.4)
+        kb = app.screen
+        assert len(kb.board.get(Stage.UNAVAILABLE, [])) == 1
+
+        # v1.6.0 — p/P print: detailed listing on screen + a text file on disk
+        import os as _os
+        kb.col = BOARD_ORDER.index(Stage.UNAVAILABLE)
+        kb._restyle(); await pilot.pause(0.1)
+        kb.action_print_column(); await pilot.pause(0.3)
+        assert isinstance(app.screen, TextModal), type(app.screen).__name__
+        body = app.screen._body
+        assert "NOT ACCEPTING" in body and "NCT" in body and "sponsor:" in body
+        exports = sorted(Path(_os.environ["STUDYSCOUT_DATA"]).glob("pipeline-*.txt"))
+        assert exports, "print/export wrote no file"
+        assert "NOT ACCEPTING" in exports[-1].read_text()
+        await pilot.press("escape"); await pilot.pause(0.2)
+        kb.action_print_board(); await pilot.pause(0.3)
+        assert isinstance(app.screen, TextModal)
+        body = app.screen._body
+        for st in BOARD_ORDER:                              # every column present
+            assert st.label.upper() in body, st
+        await pilot.press("escape"); await pilot.pause(0.2)
+        await pilot.press("escape"); await pilot.pause(0.2)
+        assert isinstance(app.screen, MainScreen)
+        eng.set_stage(parked_id, Stage.NEW)                 # restore
+        app.screen.reload(); await pilot.pause(0.2)
+
         # MODELS: provider radio rebuilds the model radio list live
         from studyscout.tui.models_screen import CATALOG, ModelsScreen
         msn = ModelsScreen(eng)

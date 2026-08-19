@@ -170,6 +170,33 @@ def main() -> None:
     assert _system_text("plain") == "plain"
     print("system_blocks OK")
 
+    # v1.6.0 — mail routing: outlook deeplink + command placeholders
+    from studyscout.mail import build_mailto, build_outlook_url
+    ol = build_outlook_url("cra@sponsor.test", "Site interest — NCT1", "Hola & adiós")
+    assert ol.startswith("https://outlook.office.com/mail/deeplink/compose?")
+    assert "to=cra%40sponsor.test" in ol
+    assert "subject=Site%20interest" in ol and "Hola%20%26%20adi" in ol
+    assert build_mailto("a@b.c", "s", "b").startswith("mailto:a@b.c?")
+    # placeholder substitution: {url}/{to} swapped in, URL NOT appended
+    from unittest import mock as _mock
+
+    from studyscout import mail as _mail
+    calls = []
+    with _mock.patch.object(_mail.subprocess, "Popen",
+                            lambda argv, **kw: calls.append(argv)), \
+         _mock.patch.object(_mail.shutil, "which", lambda x: "/usr/bin/" + x):
+        ok, msg = _mail.open_mail("a@b.c", "S", "B", command="mycli --open {url}",
+                                  mode="outlook")
+        assert ok and calls[-1][0] == "mycli"
+        assert calls[-1][-1].startswith("https://outlook.office.com/")
+        assert len(calls[-1]) == 3, calls[-1]           # nothing appended
+        ok, msg = _mail.open_mail("a@b.c", "S", "B", command="prospect-mail")
+        assert ok and calls[-1] == ["prospect-mail",
+                                    build_mailto("a@b.c", "S", "B")]  # appended
+        ok, msg = _mail.open_mail("a@b.c", "S", "B", mode="outlook")
+        assert ok and calls[-1][0] == "xdg-open" and "deeplink" in calls[-1][1]
+    print("mail routing OK ·", len(calls), "launches intercepted")
+
     print("\nALL GREEN")
 
 

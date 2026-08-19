@@ -109,7 +109,8 @@ DEFAULTS: dict[str, Any] = {
         "splash": True,
         "show_menu": True,
         "wintermute_pane": True,
-        "mail_command": "",              # blank = xdg-open; or "evolution"
+        "mail_command": "",              # blank = xdg-open; or "evolution"; placeholders {url} {to} {subject} {body}
+        "mail_mode": "mailto",           # mailto | outlook (Outlook Web deeplink compose — for O365/Prospect Mail shops)
         "accent": "amber",
     },
 }

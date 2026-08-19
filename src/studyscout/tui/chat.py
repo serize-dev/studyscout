@@ -14,7 +14,13 @@ from .chatinput import ChatInput
 
 
 class ChatScreen(ModalScreen):
-    BINDINGS = [("escape", "dismiss", "close"), ("ctrl+n", "fresh", "new thread")]
+    # ctrl+e/ctrl+u also bound at screen level (v1.6.0) so they fire with the
+    # focus on the log — not only inside the input (the v1.5.1 focus lesson).
+    BINDINGS = [
+        ("escape", "dismiss", "close"), ("ctrl+n", "fresh", "new thread"),
+        ("ctrl+e", "compose_email", "fold → email"),
+        ("ctrl+u", "revise_site", "update site"),
+    ]
 
     def __init__(self, consigliere, study: Study | None, notes: str = "", history: list | None = None):
         super().__init__()
@@ -86,6 +92,12 @@ class ChatScreen(ModalScreen):
     def on_chat_input_compose(self, event: ChatInput.Compose) -> None:
         self._compose_email()
 
+    def action_compose_email(self) -> None:
+        self._compose_email()
+
+    def action_revise_site(self) -> None:
+        self._revise()
+
     @work(exclusive=True)
     async def _compose_email(self) -> None:
         from .modals import TextModal
@@ -101,7 +113,8 @@ class ChatScreen(ModalScreen):
             return
         to = self.study.best_contact().email if self.study else None
         subject = f"Site interest — {self.study.nct}" if self.study else "Site outreach"
-        mail_ctx = (to, subject, self.consigliere.cfg.get("ui.mail_command", ""))
+        mail_ctx = (to, subject, self.consigliere.cfg.get("ui.mail_command", ""),
+                    self.consigliere.cfg.get("ui.mail_mode", "mailto"))
         title = f"OUTREACH · {self.study.nct}" if self.study else "OUTREACH · from chat"
         self.app.push_screen(TextModal(title, draft, amber=True, copyable=True, mail=mail_ctx))
         log.write(Text.from_markup("[#33ff88 b]draft ready[/] [dim]· c copy · o open in mail[/]"))

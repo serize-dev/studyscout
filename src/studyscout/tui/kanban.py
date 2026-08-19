@@ -22,13 +22,14 @@ from .widgets import STAGE_COLOR
 # un-flagging (0/u) drops a study back to the deck inbox — off the board.
 BOARD_ORDER = [
     Stage.FLAGGED, Stage.CONTACTED, Stage.WAITING, Stage.REPLIED,
-    Stage.MEETING, Stage.WON, Stage.FUTURE, Stage.DECLINED, Stage.CLOSED,
+    Stage.MEETING, Stage.WON, Stage.FUTURE, Stage.DECLINED,
+    Stage.UNAVAILABLE, Stage.CLOSED,
 ]
 
 MOVE_KEYS = {
     "1": Stage.FLAGGED, "2": Stage.CONTACTED, "3": Stage.WAITING, "4": Stage.REPLIED,
     "5": Stage.MEETING, "6": Stage.WON, "7": Stage.DECLINED, "8": Stage.CLOSED,
-    "9": Stage.FUTURE, "0": Stage.NEW, "u": Stage.NEW,
+    "9": Stage.FUTURE, "0": Stage.NEW, "u": Stage.NEW, "x": Stage.UNAVAILABLE,
 }
 
 
@@ -39,6 +40,8 @@ class KanbanScreen(Screen):
         ("up,k", "up", "↑"), ("down,j", "down", "↓"),
         ("o,enter", "open", "open"),
         ("a", "toggle_all", "all/filtered"),
+        ("p", "print_column", "print col"),
+        ("P", "print_board", "print board"),
     ]
 
     def __init__(self, engine, text_filter: str = ""):
@@ -74,8 +77,8 @@ class KanbanScreen(Screen):
                  "flag one there (key 1) to start the pipeline[/]" if total == 0 else "")
         self.query_one("#topbar", Static).update(Text.from_markup(
             "[b #33ff88]STUDY//SCOUT · PIPELINE BOARD[/]" + flt + empty + "   "
-            "[dim]h/l column · j/k card · 1-9 set stage (9 = future outreach) · [#ffb000]0/u → inbox (off board)[/] · "
-            "o open · esc back[/]"))
+            "[dim]h/l column · j/k card · 1-9 stage · x not-accepting · [#ffb000]0/u → inbox[/] · "
+            "p/P print col/board · o open · esc back[/]"))
 
     def _match(self, study) -> bool:
         if self.show_all or not self.text_filter:
@@ -193,6 +196,61 @@ class KanbanScreen(Screen):
 
     def action_back(self) -> None:
         self.app.pop_screen()
+
+    # ---- print / export (v1.6.0) -------------------------------------------- #
+    def _export_text(self, cols) -> str:
+        """A printable, detailed listing of the given columns."""
+        from datetime import datetime
+        lines = []
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        lines.append(f"STUDY//SCOUT · PIPELINE · {stamp}")
+        if self.text_filter and not self.show_all:
+            lines.append(f"filter: /{self.text_filter}")
+        for st in cols:
+            items = self.board.get(st, [])
+            lines.append("")
+            lines.append(f"{'=' * 62}")
+            lines.append(f"{st.glyph} {st.label.upper()}  ({len(items)})")
+            lines.append(f"{'=' * 62}")
+            if not items:
+                lines.append("  —")
+                continue
+            for study, notes in items:
+                lines.append("")
+                lines.append(f"• {study.nct} · {study.phase_str} · {study.status_short}")
+                lines.append(f"  {study.title}")
+                lines.append(f"  sponsor: {study.sponsor or '—'}")
+                contact = study.best_contact()
+                if contact and contact.has_direct:
+                    lines.append(f"  contact: {contact.render()}")
+                if notes:
+                    lines.append(f"  notes:   {notes}")
+                lines.append(f"  {study.url}")
+        lines.append("")
+        return "\n".join(lines)
+
+    def _export(self, cols, scope: str) -> None:
+        from datetime import datetime
+
+        from ..config import data_dir
+        text = self._export_text(cols)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        path = data_dir() / f"pipeline-{scope}-{stamp}.txt"
+        try:
+            path.write_text(text, encoding="utf-8")
+            saved = f"saved → {path}"
+        except Exception as exc:  # noqa: BLE001
+            saved = f"save failed: {exc}"
+        from .modals import TextModal
+        title = f"PRINT · {scope.upper()}  [dim]· c copy · saved to disk — print with: lp {path.name}[/]"
+        self.app.push_screen(TextModal(title, text, copyable=True))
+        self.notify(saved, severity="information")
+
+    def action_print_column(self) -> None:
+        self._export([self.cols[self.col]], self.cols[self.col].value)
+
+    def action_print_board(self) -> None:
+        self._export(list(self.cols), "board")
 
     async def on_key(self, event) -> None:
         if event.key in MOVE_KEYS:

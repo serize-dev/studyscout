@@ -25,7 +25,7 @@ from .wintermute import WintermutePane
 STAGE_KEYS = {
     "1": Stage.FLAGGED, "2": Stage.CONTACTED, "3": Stage.WAITING, "4": Stage.REPLIED,
     "5": Stage.MEETING, "6": Stage.WON, "7": Stage.DECLINED, "8": Stage.CLOSED,
-    "9": Stage.FUTURE, "0": Stage.NEW,
+    "9": Stage.FUTURE, "0": Stage.NEW, "x": Stage.UNAVAILABLE,
 }
 
 
@@ -53,6 +53,9 @@ class MainScreen(Screen):
         Binding("j", "cursor_down", "", show=False),
         Binding("k", "cursor_up", "", show=False),
         Binding("a", "stale_toggle", "stale", show=False),
+        # v1.6.0 — fold-chat-to-email works from ANY pane (deck/detail too);
+        # the ChatInput still consumes ctrl+e itself when it has focus.
+        Binding("ctrl+e", "compose_from_chat", "email from chat", show=False),
     ]
 
     # deck column index → sort key (click a header to sort by it; again flips)
@@ -136,7 +139,7 @@ class MainScreen(Screen):
                     if q in f"{r[0].title} {r[0].sponsor} {r[0].nct} {' '.join(r[0].conditions)}".lower()]
         view = apply_sort(view, STUDY_SORTS, self.sort_key, self.sort_flipped)
         # Dead deals sink regardless of the chosen sort (stable, so order holds within).
-        view = sorted(view, key=lambda r: (r[1] in (Stage.CLOSED, Stage.DECLINED),))
+        view = sorted(view, key=lambda r: (r[1] in (Stage.CLOSED, Stage.DECLINED, Stage.UNAVAILABLE),))
         self.view = view
         self.populate()
 
@@ -273,6 +276,16 @@ class MainScreen(Screen):
         wm = self.wm_pane
         if wm:
             wm.toggle_class("hidden")
+
+    def action_compose_from_chat(self) -> None:
+        wm = self.wm_pane
+        if not wm or wm.has_class("hidden"):
+            self.flash("Wintermute pane is hidden — \\ shows it", "#ffb000")
+            return
+        if not wm.history:
+            self.flash("chat with Wintermute first, then ctrl+e folds it into an email", "#ffb000")
+            return
+        wm._compose_email()
 
     def action_escape(self) -> None:
         if isinstance(self.focused, (Input, TextArea)):
@@ -512,7 +525,8 @@ class MainScreen(Screen):
             self.flash(f"draft failed: {exc}", "#ff5555")
             return
         to = study.best_contact().email
-        mail_ctx = (to, f"Site interest — {study.nct}", self.engine.cfg.get("ui.mail_command", ""))
+        mail_ctx = (to, f"Site interest — {study.nct}", self.engine.cfg.get("ui.mail_command", ""),
+                    self.engine.cfg.get("ui.mail_mode", "mailto"))
         self.app.push_screen(TextModal(f"OUTREACH · {study.nct}", draft, amber=True,
                                        copyable=True, mail=mail_ctx))
         self.flash("draft ready · c copy · o open in mail")

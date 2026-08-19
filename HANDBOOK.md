@@ -1,5 +1,5 @@
 # STUDY//SCOUT — THE HANDBOOK
-### v1.5.0 · the definitive manual
+### v1.6.0 · the definitive manual
 
 A phosphor-green terminal for clinical-trials business development. It hunts
 ClinicalTrials.gov for studies that fit your site, groups them into **sponsor
@@ -46,8 +46,13 @@ the whole ocean — `studyscout doctor` will call it out.
 ## 3 · The board & dossiers
 
 - **Pipeline stages:** New → Flagged → Contacted → Waiting → Replied →
-  Meeting → Won · **Future** (`9`) · Declined · Closed. Single keys move the
-  selected study (see F1); stage changes stamp the sponsor's last-touch.
+  Meeting → Won · **Future** (`9`) · Declined · **Not Accepting** (`x`) ·
+  Closed. Single keys move the selected study (see F1); stage changes stamp
+  the sponsor's last-touch.
+- **`x` vs `8` — the two graveyards** (v1.6.0): `x` NOT ACCEPTING = the study
+  isn't taking new sites — you never got in. `8` CLOSED = the archive of
+  studies **your site ran** that have since completed. Both sink to the bottom
+  of the deck and live in their own board columns.
 - **`9` — FUTURE OUTREACH** (v1.5.0): "current study closed, but the CMO said
   call us for the next one" — warm relationships, not dead ones. The board has
   a FUTURE column, and the **morning briefing nags you** when a FUTURE sponsor
@@ -60,6 +65,10 @@ the whole ocean — `studyscout doctor` will call it out.
   back to the inbox — **off the board entirely**. The board **inherits the
   deck's `/` text filter** (v1.4.1) — `/covid` on the deck, then K = only the
   covid pipeline; `a` on the board lifts/re-applies the filter.
+- **`p` / `P` — print the board** (v1.6.0): `p` exports the current column,
+  `P` the whole board — a detailed listing (NCT · phase · status · title ·
+  sponsor · contact · notes · link) shown on screen (`c` copies) **and saved
+  as a text file in the data dir** — send it to paper with `lp <file>`.
 - **The keyword-net trap**: whatever you put in the Keyword box silently ANDs
   into EVERY search — a leftover net from last month's hunt will poison a new
   condition search. The FILTERS panel shows an amber **keyword net ACTIVE**
@@ -79,7 +88,17 @@ the whole ocean — `studyscout doctor` will call it out.
   angle with Wintermute — hooks, wording, tone — then `ctrl+e` produces the
   final email *as agreed in the conversation*, in the same draft modal
   (`c` copy · `o` open in mail). Where the chat and the default email rules
-  disagree, the chat wins. Works in the side pane and the full screen (`c`).
+  disagree, the chat wins. Works in the side pane and the full screen (`c`) —
+  and since v1.6.0 the key fires with the focus ANYWHERE (log, deck, detail),
+  not just inside the chat input.
+- **`o` on a draft — where the email opens** (v1.6.0): `ui.mail_mode` in
+  `profile.toml` picks the route. `"mailto"` (default) hands the draft to the
+  system mail client (`ui.mail_command` overrides the launcher and may use
+  `{url} {to} {subject} {body}` placeholders). `"outlook"` opens **Outlook
+  Web's compose deeplink in the browser** — draft prefilled in your O365
+  account. That's the route for Outlook shops: desktop wrappers like Prospect
+  Mail take no compose arguments, but the browser deeplink reaches the same
+  account/mailbox.
 - **`b` — morning briefing:** what changed since yesterday (deltas), sponsors
   gone quiet (`followup.nudge_days`), and today's top three.
 - **`R` — reg handoff:** after a WIN, the CDA→SIV paperwork checklist

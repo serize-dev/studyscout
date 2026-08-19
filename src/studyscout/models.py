@@ -25,7 +25,8 @@ class Stage(str, Enum):
     WON = "won"               # study/engagement landed
     FUTURE = "future"          # relationship warm — reach out for FUTURE studies
     DECLINED = "declined"
-    CLOSED = "closed"          # dead / not a fit
+    UNAVAILABLE = "unavailable"  # study not accepting new sites — never got in
+    CLOSED = "closed"          # we participated — study now completed (the archive)
 
     @property
     def label(self) -> str:
@@ -33,21 +34,25 @@ class Stage(str, Enum):
             Stage.NEW: "Inbox", Stage.FLAGGED: "Flagged", Stage.CONTACTED: "Contacted",
             Stage.WAITING: "Waiting", Stage.REPLIED: "Replied", Stage.MEETING: "Meeting",
             Stage.WON: "Won", Stage.FUTURE: "Future", Stage.DECLINED: "Declined",
-            Stage.CLOSED: "Closed",
+            Stage.UNAVAILABLE: "Not Accepting", Stage.CLOSED: "Closed",
         }[self]
 
     @property
     def glyph(self) -> str:
+        # NB: glyphs must be single-cell in terminals — "✉" (used through v1.5.3)
+        # renders double-width in many fonts while Rich counts 1 cell, so the
+        # board header's count overprinted the label. "«" is width-safe.
         return {
             Stage.NEW: "·", Stage.FLAGGED: "⚑", Stage.CONTACTED: "→", Stage.WAITING: "…",
-            Stage.REPLIED: "✉", Stage.MEETING: "★", Stage.WON: "✓",
-            Stage.FUTURE: "⟳", Stage.DECLINED: "✗", Stage.CLOSED: "▪",
+            Stage.REPLIED: "«", Stage.MEETING: "★", Stage.WON: "✓",
+            Stage.FUTURE: "⟳", Stage.DECLINED: "✗", Stage.UNAVAILABLE: "ø", Stage.CLOSED: "▪",
         }[self]
 
 
 KANBAN_ORDER = [
     Stage.NEW, Stage.FLAGGED, Stage.CONTACTED, Stage.WAITING,
     Stage.REPLIED, Stage.MEETING, Stage.WON, Stage.FUTURE, Stage.DECLINED,
+    Stage.UNAVAILABLE, Stage.CLOSED,
 ]
 
 # Sponsor classes worth weighting for BD (industry = paying customers).
