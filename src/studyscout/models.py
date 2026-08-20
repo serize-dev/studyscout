@@ -22,7 +22,8 @@ class Stage(str, Enum):
     WAITING = "waiting"        # awaiting their reply
     REPLIED = "replied"
     MEETING = "meeting"        # call/meeting booked
-    WON = "won"               # study/engagement landed
+    WON = "won"               # study/engagement landed — startup underway
+    CONDUCTING = "conducting"  # your site is RUNNING it — the live book
     FUTURE = "future"          # relationship warm — reach out for FUTURE studies
     DECLINED = "declined"
     UNAVAILABLE = "unavailable"  # study not accepting new sites — never got in
@@ -33,8 +34,9 @@ class Stage(str, Enum):
         return {
             Stage.NEW: "Inbox", Stage.FLAGGED: "Flagged", Stage.CONTACTED: "Contacted",
             Stage.WAITING: "Waiting", Stage.REPLIED: "Replied", Stage.MEETING: "Meeting",
-            Stage.WON: "Won", Stage.FUTURE: "Future", Stage.DECLINED: "Declined",
-            Stage.UNAVAILABLE: "Not Accepting", Stage.CLOSED: "Closed",
+            Stage.WON: "Won", Stage.CONDUCTING: "Conducting", Stage.FUTURE: "Future",
+            Stage.DECLINED: "Declined", Stage.UNAVAILABLE: "Not Accepting",
+            Stage.CLOSED: "Closed",
         }[self]
 
     @property
@@ -44,15 +46,15 @@ class Stage(str, Enum):
         # board header's count overprinted the label. "«" is width-safe.
         return {
             Stage.NEW: "·", Stage.FLAGGED: "⚑", Stage.CONTACTED: "→", Stage.WAITING: "…",
-            Stage.REPLIED: "«", Stage.MEETING: "★", Stage.WON: "✓",
+            Stage.REPLIED: "«", Stage.MEETING: "★", Stage.WON: "✓", Stage.CONDUCTING: "»",
             Stage.FUTURE: "⟳", Stage.DECLINED: "✗", Stage.UNAVAILABLE: "ø", Stage.CLOSED: "▪",
         }[self]
 
 
 KANBAN_ORDER = [
     Stage.NEW, Stage.FLAGGED, Stage.CONTACTED, Stage.WAITING,
-    Stage.REPLIED, Stage.MEETING, Stage.WON, Stage.FUTURE, Stage.DECLINED,
-    Stage.UNAVAILABLE, Stage.CLOSED,
+    Stage.REPLIED, Stage.MEETING, Stage.WON, Stage.CONDUCTING, Stage.FUTURE,
+    Stage.DECLINED, Stage.UNAVAILABLE, Stage.CLOSED,
 ]
 
 # Sponsor classes worth weighting for BD (industry = paying customers).
@@ -184,7 +186,7 @@ class SponsorDossier:
     @property
     def in_pipeline(self) -> int:
         """Trials you've actually moved on (anything past Inbox, still alive)."""
-        dead = (Stage.NEW, Stage.CLOSED, Stage.DECLINED)
+        dead = (Stage.NEW, Stage.CLOSED, Stage.DECLINED, Stage.UNAVAILABLE)
         return sum(1 for _s, st, _n in self.rows if st not in dead)
 
     @property

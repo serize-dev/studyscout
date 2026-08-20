@@ -31,10 +31,11 @@ HELP_TEXT = """\
 
 [b #ffb000]PIPELINE   (set the selected study's stage)[/]
   [#33ff66]1[/] flagged  [#33ff66]2[/] contacted  [#33ff66]3[/] waiting  [#33ff66]4[/] replied
-  [#33ff66]5[/] meeting  [#33ff66]6[/] won  [#33ff66]9[/] future outreach  [#33ff66]7[/] declined  [#33ff66]x[/] not accepting  [#33ff66]8[/] closed  [#33ff66]0[/] inbox
+  [#33ff66]5[/] meeting  [#33ff66]6[/] won  [#33ff66]C[/] conducting  [#33ff66]9[/] future outreach  [#33ff66]7[/] declined  [#33ff66]x[/] not accepting  [#33ff66]8[/] closed  [#33ff66]0[/] inbox
   [dim]9 = relationship warm, "call us for the next study" — the briefing nags you
   when a FUTURE sponsor has been parked past followup.future_nudge_days (45d).
-  x = study not accepting new sites (never got in) · 8 = closed: WE ran it, study over.[/]
+  The site lifecycle: 6 won (startup) → C CONDUCTING (running at your site — the
+  live book) → 8 closed (completed archive).  x = never got in (not accepting).[/]
 
 [b #ffb000]ACTIONS[/]
   [#33ff66]b[/]   morning briefing — new trials · status flips · quiet sponsors · top 3

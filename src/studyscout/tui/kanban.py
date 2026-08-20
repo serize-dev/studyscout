@@ -22,7 +22,7 @@ from .widgets import STAGE_COLOR
 # un-flagging (0/u) drops a study back to the deck inbox — off the board.
 BOARD_ORDER = [
     Stage.FLAGGED, Stage.CONTACTED, Stage.WAITING, Stage.REPLIED,
-    Stage.MEETING, Stage.WON, Stage.FUTURE, Stage.DECLINED,
+    Stage.MEETING, Stage.WON, Stage.CONDUCTING, Stage.FUTURE, Stage.DECLINED,
     Stage.UNAVAILABLE, Stage.CLOSED,
 ]
 
@@ -30,6 +30,7 @@ MOVE_KEYS = {
     "1": Stage.FLAGGED, "2": Stage.CONTACTED, "3": Stage.WAITING, "4": Stage.REPLIED,
     "5": Stage.MEETING, "6": Stage.WON, "7": Stage.DECLINED, "8": Stage.CLOSED,
     "9": Stage.FUTURE, "0": Stage.NEW, "u": Stage.NEW, "x": Stage.UNAVAILABLE,
+    "C": Stage.CONDUCTING,
 }
 
 
@@ -77,7 +78,7 @@ class KanbanScreen(Screen):
                  "flag one there (key 1) to start the pipeline[/]" if total == 0 else "")
         self.query_one("#topbar", Static).update(Text.from_markup(
             "[b #33ff88]STUDY//SCOUT · PIPELINE BOARD[/]" + flt + empty + "   "
-            "[dim]h/l column · j/k card · 1-9 stage · x not-accepting · [#ffb000]0/u → inbox[/] · "
+            "[dim]h/l column · j/k card · 1-9 stage · C conducting · x not-accepting · [#ffb000]0/u → inbox[/] · "
             "p/P print col/board · o open · esc back[/]"))
 
     def _match(self, study) -> bool:

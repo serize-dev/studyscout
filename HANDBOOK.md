@@ -1,5 +1,5 @@
 # STUDY//SCOUT — THE HANDBOOK
-### v1.6.0 · the definitive manual
+### v1.7.0 · the definitive manual
 
 A phosphor-green terminal for clinical-trials business development. It hunts
 ClinicalTrials.gov for studies that fit your site, groups them into **sponsor
@@ -46,9 +46,15 @@ the whole ocean — `studyscout doctor` will call it out.
 ## 3 · The board & dossiers
 
 - **Pipeline stages:** New → Flagged → Contacted → Waiting → Replied →
-  Meeting → Won · **Future** (`9`) · Declined · **Not Accepting** (`x`) ·
-  Closed. Single keys move the selected study (see F1); stage changes stamp
-  the sponsor's last-touch.
+  Meeting → Won → **Conducting** (`C`) · **Future** (`9`) · Declined ·
+  **Not Accepting** (`x`) · Closed. Single keys move the selected study
+  (see F1); stage changes stamp the sponsor's last-touch.
+- **`C` — CONDUCTING** (v1.7.0): the studies your site is **running right
+  now** — the live book, and the seed of the pseudo-CTMS. The site lifecycle
+  reads left to right on the board: `6` WON (landed, startup paperwork — the
+  `R` checklist keeps nagging here) → `C` CONDUCTING (enrolling/active) →
+  `8` CLOSED (completed archive). Conducting counts as an alive relationship
+  in the sponsor dossiers.
 - **`x` vs `8` — the two graveyards** (v1.6.0): `x` NOT ACCEPTING = the study
   isn't taking new sites — you never got in. `8` CLOSED = the archive of
   studies **your site ran** that have since completed. Both sink to the bottom

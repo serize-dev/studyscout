@@ -26,6 +26,7 @@ STAGE_KEYS = {
     "1": Stage.FLAGGED, "2": Stage.CONTACTED, "3": Stage.WAITING, "4": Stage.REPLIED,
     "5": Stage.MEETING, "6": Stage.WON, "7": Stage.DECLINED, "8": Stage.CLOSED,
     "9": Stage.FUTURE, "0": Stage.NEW, "x": Stage.UNAVAILABLE,
+    "C": Stage.CONDUCTING,      # shift+c — lowercase c stays the WM chat
 }
 
 
@@ -214,7 +215,8 @@ class MainScreen(Screen):
         c = self.engine.counts()
         seg = "  ".join(f"[dim]{st.label} {c.get(st,0)}[/]"
                         for st in (Stage.NEW, Stage.FLAGGED, Stage.CONTACTED, Stage.WAITING,
-                                   Stage.REPLIED, Stage.MEETING, Stage.WON, Stage.FUTURE))
+                                   Stage.REPLIED, Stage.MEETING, Stage.WON, Stage.CONDUCTING,
+                                   Stage.FUTURE))
         tf = f" [#00ff88]/{self.text_filter}[/]" if self.text_filter else ""
         arrow = sort_arrow(STUDY_SORTS, self.sort_key, self.sort_flipped)
         try:

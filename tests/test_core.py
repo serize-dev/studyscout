@@ -197,6 +197,17 @@ def main() -> None:
         assert ok and calls[-1][0] == "xdg-open" and "deeplink" in calls[-1][1]
     print("mail routing OK ·", len(calls), "launches intercepted")
 
+    # v1.7.0 — dossier aliveness: CONDUCTING counts, UNAVAILABLE doesn't
+    from studyscout.models import SponsorDossier
+    ss = _studies()
+    d0 = SponsorDossier(name="Acme", rows=[
+        (ss[0], Stage.CONDUCTING, ""),
+        (ss[1], Stage.UNAVAILABLE, ""),
+        (ss[2], Stage.CLOSED, ""),
+    ])
+    assert d0.in_pipeline == 1, d0.in_pipeline
+    print("conducting aliveness OK")
+
     print("\nALL GREEN")
 
 

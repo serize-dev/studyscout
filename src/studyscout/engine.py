@@ -137,10 +137,10 @@ class Engine:
         return sum(1 for _i, d in state if d), len(state)
 
     def reg_open(self) -> list[tuple[Study, int, int]]:
-        """Won (and meeting-stage) studies with startup paperwork still open."""
+        """Won/meeting/conducting studies with startup paperwork still open."""
         out = []
         for study, stage, _n in self.load():
-            if stage not in (Stage.WON, Stage.MEETING):
+            if stage not in (Stage.WON, Stage.MEETING, Stage.CONDUCTING):
                 continue
             done, total = self.reg_progress(study.id)
             if total and done < total:

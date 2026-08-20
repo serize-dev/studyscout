@@ -363,6 +363,28 @@ async def main() -> None:
         eng.set_stage(parked_id, Stage.NEW)                 # restore
         app.screen.reload(); await pilot.pause(0.2)
 
+        # v1.7.0 — C = CONDUCTING: the live book between WON and CLOSED
+        scr = app.screen
+        assert Stage.CONDUCTING in BOARD_ORDER
+        assert BOARD_ORDER.index(Stage.CONDUCTING) == BOARD_ORDER.index(Stage.WON) + 1
+        scr.query_one("#listings").focus(); await pilot.pause(0.1)
+        scr.query_one("#listings").move_cursor(row=0); await pilot.pause(0.1)
+        live_id = scr.current_id
+        await pilot.press("C"); await pilot.pause(0.2)      # shift+c ≠ c (chat)
+        assert scr.by_id[live_id][1] == Stage.CONDUCTING
+        assert scr.view[0][0].id == live_id                 # ALIVE — does not sink
+        await pilot.press("K"); await pilot.pause(0.4)
+        kb = app.screen
+        assert len(kb.board.get(Stage.CONDUCTING, [])) == 1
+        kb.action_print_board(); await pilot.pause(0.3)
+        assert isinstance(app.screen, TextModal)
+        assert "CONDUCTING" in app.screen._body
+        await pilot.press("escape"); await pilot.pause(0.2)
+        await pilot.press("escape"); await pilot.pause(0.2)
+        assert isinstance(app.screen, MainScreen)
+        eng.set_stage(live_id, Stage.NEW)                   # restore
+        app.screen.reload(); await pilot.pause(0.2)
+
         # MODELS: provider radio rebuilds the model radio list live
         from studyscout.tui.models_screen import CATALOG, ModelsScreen
         msn = ModelsScreen(eng)
