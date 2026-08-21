@@ -26,6 +26,7 @@ class Stage(str, Enum):
     CONDUCTING = "conducting"  # your site is RUNNING it — the live book
     FUTURE = "future"          # relationship warm — reach out for FUTURE studies
     DECLINED = "declined"
+    UNFIT = "unfit"            # screened, not a fit for your site — your call, not theirs
     UNAVAILABLE = "unavailable"  # study not accepting new sites — never got in
     CLOSED = "closed"          # we participated — study now completed (the archive)
 
@@ -35,7 +36,8 @@ class Stage(str, Enum):
             Stage.NEW: "Inbox", Stage.FLAGGED: "Flagged", Stage.CONTACTED: "Contacted",
             Stage.WAITING: "Waiting", Stage.REPLIED: "Replied", Stage.MEETING: "Meeting",
             Stage.WON: "Won", Stage.CONDUCTING: "Conducting", Stage.FUTURE: "Future",
-            Stage.DECLINED: "Declined", Stage.UNAVAILABLE: "Not Accepting",
+            Stage.DECLINED: "Declined", Stage.UNFIT: "Not a Good Fit",
+            Stage.UNAVAILABLE: "Not Accepting",
             Stage.CLOSED: "Closed",
         }[self]
 
@@ -47,14 +49,15 @@ class Stage(str, Enum):
         return {
             Stage.NEW: "·", Stage.FLAGGED: "⚑", Stage.CONTACTED: "→", Stage.WAITING: "…",
             Stage.REPLIED: "«", Stage.MEETING: "★", Stage.WON: "✓", Stage.CONDUCTING: "»",
-            Stage.FUTURE: "⟳", Stage.DECLINED: "✗", Stage.UNAVAILABLE: "ø", Stage.CLOSED: "▪",
+            Stage.FUTURE: "⟳", Stage.DECLINED: "✗", Stage.UNFIT: "~", Stage.UNAVAILABLE: "ø",
+            Stage.CLOSED: "▪",
         }[self]
 
 
 KANBAN_ORDER = [
     Stage.NEW, Stage.FLAGGED, Stage.CONTACTED, Stage.WAITING,
     Stage.REPLIED, Stage.MEETING, Stage.WON, Stage.CONDUCTING, Stage.FUTURE,
-    Stage.DECLINED, Stage.UNAVAILABLE, Stage.CLOSED,
+    Stage.DECLINED, Stage.UNFIT, Stage.UNAVAILABLE, Stage.CLOSED,
 ]
 
 # Sponsor classes worth weighting for BD (industry = paying customers).
@@ -186,7 +189,7 @@ class SponsorDossier:
     @property
     def in_pipeline(self) -> int:
         """Trials you've actually moved on (anything past Inbox, still alive)."""
-        dead = (Stage.NEW, Stage.CLOSED, Stage.DECLINED, Stage.UNAVAILABLE)
+        dead = (Stage.NEW, Stage.CLOSED, Stage.DECLINED, Stage.UNFIT, Stage.UNAVAILABLE)
         return sum(1 for _s, st, _n in self.rows if st not in dead)
 
     @property

@@ -23,13 +23,14 @@ from .widgets import STAGE_COLOR
 BOARD_ORDER = [
     Stage.FLAGGED, Stage.CONTACTED, Stage.WAITING, Stage.REPLIED,
     Stage.MEETING, Stage.WON, Stage.CONDUCTING, Stage.FUTURE, Stage.DECLINED,
-    Stage.UNAVAILABLE, Stage.CLOSED,
+    Stage.UNFIT, Stage.UNAVAILABLE, Stage.CLOSED,
 ]
 
 MOVE_KEYS = {
     "1": Stage.FLAGGED, "2": Stage.CONTACTED, "3": Stage.WAITING, "4": Stage.REPLIED,
     "5": Stage.MEETING, "6": Stage.WON, "7": Stage.DECLINED, "8": Stage.CLOSED,
     "9": Stage.FUTURE, "0": Stage.NEW, "u": Stage.NEW, "x": Stage.UNAVAILABLE,
+    "n": Stage.UNFIT,
     "C": Stage.CONDUCTING,
 }
 

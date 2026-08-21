@@ -26,6 +26,7 @@ STAGE_KEYS = {
     "1": Stage.FLAGGED, "2": Stage.CONTACTED, "3": Stage.WAITING, "4": Stage.REPLIED,
     "5": Stage.MEETING, "6": Stage.WON, "7": Stage.DECLINED, "8": Stage.CLOSED,
     "9": Stage.FUTURE, "0": Stage.NEW, "x": Stage.UNAVAILABLE,
+    "n": Stage.UNFIT,           # v1.8.0 — screened it, not for us (your call)
     "C": Stage.CONDUCTING,      # shift+c — lowercase c stays the WM chat
 }
 
@@ -69,11 +70,45 @@ class MainScreen(Screen):
         self.view: list[tuple[Study, Stage, str]] = []
         self.by_id: dict[str, tuple[Study, Stage, str]] = {}
         self.text_filter = ""
-        self.sort_key = "start"
-        self.sort_flipped = False
+        # v1.8.0 — the sort SURVIVES restarts. Before: every launch silently reset
+        # to "start" no matter what the filters panel said ("won't autosort by
+        # sites"), and a header click on an already-active column flipped it to
+        # ascending ("sorts back down to the lowest # of sites").
+        self.sort_key, self.sort_flipped = self._load_sort()
         self.current_id: str | None = None
         self.stale: set[str] = set()
         self.show_stale = False
+
+    _SORT_KEYS = ("start", "status", "phase", "enrollment", "sites", "contact",
+                  "sponsor", "stage", "title")
+
+    def _load_sort(self) -> tuple[str, bool]:
+        cfg = self.engine.cfg
+        key = str(cfg.get("ui.sort_key", "") or "")
+        if key not in self._SORT_KEYS:
+            key = str(cfg.get("filters.sort", "start"))
+            if key not in self._SORT_KEYS:
+                key = "start"
+            return key, False
+        return key, bool(cfg.get("ui.sort_flipped", False))
+
+    def set_sort(self, key: str, flipped: bool, announce: bool = False) -> None:
+        """Single chokepoint: every sort change lands here, gets persisted, re-sorts."""
+        self.sort_key, self.sort_flipped = key, flipped
+        try:
+            self.engine.cfg.set("ui.sort_key", key)
+            self.engine.cfg.set("ui.sort_flipped", flipped)
+            self.engine.cfg.save()
+        except Exception:
+            pass  # a read-only profile must never break sorting
+        self.apply_filter()
+        if announce:
+            from .sorting import STUDY_SORTS, sort_arrow
+            spec = next((s for s in STUDY_SORTS if s.key == key), None)
+            arrow = sort_arrow(STUDY_SORTS, key, flipped)
+            natural = spec.reverse == (spec.reverse ^ flipped) if spec else True
+            how = spec.label if (spec and natural) else f"{key} — reversed"
+            self.flash(f"sort {key}{arrow}  {how}   (same column again flips)", "#ffb000")
 
     def compose(self) -> ComposeResult:
         yield Static(id="topbar")
@@ -140,7 +175,7 @@ class MainScreen(Screen):
                     if q in f"{r[0].title} {r[0].sponsor} {r[0].nct} {' '.join(r[0].conditions)}".lower()]
         view = apply_sort(view, STUDY_SORTS, self.sort_key, self.sort_flipped)
         # Dead deals sink regardless of the chosen sort (stable, so order holds within).
-        view = sorted(view, key=lambda r: (r[1] in (Stage.CLOSED, Stage.DECLINED, Stage.UNAVAILABLE),))
+        view = sorted(view, key=lambda r: (r[1] in (Stage.CLOSED, Stage.DECLINED, Stage.UNFIT, Stage.UNAVAILABLE),))
         self.view = view
         self.populate()
 
@@ -184,9 +219,8 @@ class MainScreen(Screen):
         key = self.COLUMN_SORT.get(event.column_index)
         if not key:
             return
-        self.sort_flipped = (not self.sort_flipped) if key == self.sort_key else False
-        self.sort_key = key
-        self.apply_filter()
+        flipped = (not self.sort_flipped) if key == self.sort_key else False
+        self.set_sort(key, flipped, announce=True)
 
     def action_stale_toggle(self) -> None:
         self.show_stale = not self.show_stale
@@ -390,7 +424,7 @@ class MainScreen(Screen):
 
         def picked(res):
             if res:
-                self.sort_key, self.sort_flipped = res
+                self.set_sort(*res, announce=True)
                 self.apply_filter()
         self.app.push_screen(SortModal(STUDY_SORTS, self.sort_key, self.sort_flipped), picked)
 
@@ -461,7 +495,10 @@ class MainScreen(Screen):
         # listings pane → the full table: every column, header-click sorting
         from .zoom import StudiesModal
 
-        def landed(sid):
+        def landed(res):
+            sid, key, flipped = (res if isinstance(res, tuple) else (res, None, None))
+            if key and (key in self._SORT_KEYS) and (key, flipped) != (self.sort_key, self.sort_flipped):
+                self.set_sort(key, flipped)  # v1.8.0 — zoom sort flows back to the deck
             if not sid:
                 return
             for i, (study, _st, _n) in enumerate(self.view):
@@ -492,7 +529,7 @@ class MainScreen(Screen):
                 # otherwise the radio is theater (fetch order dies at upsert)
                 chosen = str(self.engine.cfg.get("filters.sort", "start"))
                 if chosen in ("start", "sites", "enrollment"):
-                    self.sort_key, self.sort_flipped = chosen, False
+                    self.set_sort(chosen, False)
                 self.action_refresh()
         self.app.push_screen(FiltersScreen(self.engine), done)
 

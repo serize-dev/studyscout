@@ -47,7 +47,7 @@ the whole ocean — `studyscout doctor` will call it out.
 
 - **Pipeline stages:** New → Flagged → Contacted → Waiting → Replied →
   Meeting → Won → **Conducting** (`C`) · **Future** (`9`) · Declined ·
-  **Not Accepting** (`x`) · Closed. Single keys move the selected study
+  **Not a Good Fit** (`n`) · **Not Accepting** (`x`) · Closed. Single keys move the selected study
   (see F1); stage changes stamp the sponsor's last-touch.
 - **`C` — CONDUCTING** (v1.7.0): the studies your site is **running right
   now** — the live book, and the seed of the pseudo-CTMS. The site lifecycle
@@ -59,6 +59,11 @@ the whole ocean — `studyscout doctor` will call it out.
   isn't taking new sites — you never got in. `8` CLOSED = the archive of
   studies **your site ran** that have since completed. Both sink to the bottom
   of the deck and live in their own board columns.
+- **`n` — NOT A GOOD FIT** (v1.8.0): the third graveyard, and the only one
+  that's *your* verdict — you screened it (pop too small, wrong phase, no
+  pharmacy support, whatever) and passed. `7` DECLINED = *they* said no;
+  `x` NOT ACCEPTING = never got in; `n` = you said no. Sinks on the deck,
+  own board column, dead in the dossier counts.
 - **`9` — FUTURE OUTREACH** (v1.5.0): "current study closed, but the CMO said
   call us for the next one" — warm relationships, not dead ones. The board has
   a FUTURE column, and the **morning briefing nags you** when a FUTURE sponsor

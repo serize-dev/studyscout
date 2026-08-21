@@ -154,6 +154,9 @@ async def main() -> None:
         assert zm.sort_flipped and zm.rows[0][0].enrollment == 120
         await pilot.press("escape"); await pilot.pause(0.2)
         assert isinstance(app.screen, MainScreen)
+        # v1.8.0 — the zoom's sort comes home to the deck, even on escape
+        assert scr.sort_key == "enrollment" and scr.sort_flipped, (scr.sort_key, scr.sort_flipped)
+        assert scr.view[0][0].enrollment == 120
 
         # v1.2.0 — deck header-click sorting (column 3 = SITE)
         scr.on_data_table_header_selected(SimpleNamespace(column_index=3))
@@ -384,6 +387,42 @@ async def main() -> None:
         assert isinstance(app.screen, MainScreen)
         eng.set_stage(live_id, Stage.NEW)                   # restore
         app.screen.reload(); await pilot.pause(0.2)
+
+        # v1.8.0 — n = NOT A GOOD FIT: your verdict; sinks on deck, own column
+        scr = app.screen
+        assert Stage.UNFIT in BOARD_ORDER
+        assert BOARD_ORDER.index(Stage.UNFIT) == BOARD_ORDER.index(Stage.DECLINED) + 1
+        scr.query_one("#listings").focus(); await pilot.pause(0.1)
+        scr.query_one("#listings").move_cursor(row=0); await pilot.pause(0.1)
+        unfit_id = scr.current_id
+        await pilot.press("n"); await pilot.pause(0.2)
+        assert scr.by_id[unfit_id][1] == Stage.UNFIT
+        assert scr.view[-1][0].id == unfit_id            # dead-sink
+        await pilot.press("K"); await pilot.pause(0.4)
+        kb = app.screen
+        assert len(kb.board.get(Stage.UNFIT, [])) == 1
+        assert "NOT A GOOD FIT" in str(kb.query_one(f"#head-{Stage.UNFIT.value}").render())
+        # board-side n too: move a flagged card into the column
+        kb.action_print_board(); await pilot.pause(0.3)
+        assert "NOT A GOOD FIT" in app.screen._body
+        await pilot.press("escape"); await pilot.pause(0.2)
+        await pilot.press("escape"); await pilot.pause(0.2)
+        assert isinstance(app.screen, MainScreen)
+        eng.set_stage(unfit_id, Stage.NEW)
+        app.screen.reload(); await pilot.pause(0.2)
+
+        # v1.8.0 — sort persists: header click → cfg; fresh MainScreen restores it
+        scr = app.screen
+        scr.set_sort("start", False)
+        scr.on_data_table_header_selected(SimpleNamespace(column_index=3)); await pilot.pause(0.1)
+        assert scr.sort_key == "sites" and not scr.sort_flipped
+        assert eng.cfg.get("ui.sort_key") == "sites" and eng.cfg.get("ui.sort_flipped") is False
+        scr.on_data_table_header_selected(SimpleNamespace(column_index=3)); await pilot.pause(0.1)
+        assert scr.sort_flipped and eng.cfg.get("ui.sort_flipped") is True
+        assert MainScreen(eng)._load_sort() == ("sites", True)      # survives a relaunch
+        eng.cfg.set("ui.sort_key", ""); eng.cfg.set("filters.sort", "enrollment"); eng.cfg.save()
+        assert MainScreen(eng)._load_sort() == ("enrollment", False)  # no saved sort → filters choice
+        scr.set_sort("sites", False)                        # leave the deck multi-site first
 
         # MODELS: provider radio rebuilds the model radio list live
         from studyscout.tui.models_screen import CATALOG, ModelsScreen

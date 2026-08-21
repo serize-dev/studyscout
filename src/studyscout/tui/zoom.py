@@ -21,7 +21,7 @@ COLUMN_KEYS = ["stage", "nct", "phase", "status", "sites", "enrollment",
 
 class StudiesModal(ModalScreen):
     BINDINGS = [
-        ("escape,q,z", "dismiss", "close"),
+        ("escape,q,z", "close", "close"),
         ("o,enter", "choose", "select"),
         ("j", "cursor_down", ""),
         ("k", "cursor_up", ""),
@@ -89,14 +89,18 @@ class StudiesModal(ModalScreen):
     def action_cursor_up(self) -> None:
         self.query_one("#zoomtable", DataTable).action_cursor_up()
 
+    def action_close(self) -> None:
+        # v1.8.0 — even on escape, a sort picked in the zoom comes home to the deck
+        self.dismiss((None, self.sort_key, self.sort_flipped))
+
     def action_choose(self) -> None:
         table = self.query_one("#zoomtable", DataTable)
         try:
             from textual.coordinate import Coordinate
             key = table.coordinate_to_cell_key(Coordinate(table.cursor_row, 0)).row_key
-            self.dismiss(key.value)
+            self.dismiss((key.value, self.sort_key, self.sort_flipped))
         except Exception:
-            self.dismiss(None)
+            self.dismiss((None, self.sort_key, self.sort_flipped))
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         self.dismiss(event.row_key.value)

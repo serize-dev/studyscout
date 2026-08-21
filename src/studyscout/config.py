@@ -110,6 +110,8 @@ DEFAULTS: dict[str, Any] = {
         "show_menu": True,
         "wintermute_pane": True,
         "mail_command": "",              # blank = xdg-open; or "evolution"; placeholders {url} {to} {subject} {body}
+        "sort_key": "",                  # deck sort, persisted across launches ("" = follow filters.sort)
+        "sort_flipped": False,
         "mail_mode": "mailto",           # mailto | outlook (Outlook Web deeplink compose — for O365/Prospect Mail shops)
         "accent": "amber",
     },
