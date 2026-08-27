@@ -27,6 +27,17 @@ HELP_TEXT = """\
   [#33ff66]K[/]           PIPELINE BOARD — worked stages only (also in the menu);
               on the board: [#33ff66]0/u[/] sends a card back to the inbox (off the board);
               [#33ff66]p[/] prints the column · [#33ff66]P[/] the whole board (saved as a text file too)
+  [#33ff66]G[/]           REGULATORY BOARD — startup gauntlet by phase (FEASIBILITY → REG DOCS →
+              IRB → CONTRACTS → ACTIVATION → ACTIVATED); a study moves itself as you check
+              items off. enter/R checklist · C → conducting · t follow-up · p/P print
+  [#33ff66]L[/]           LEADS — off-registry prospects (no NCT): a PI, a program, an act, a
+              network. a add · enter edit · d drop. A lead rides EVERYTHING: stages,
+              the board, the dossier (by organization), m outreach, c chat, R reg, t/T.
+  [#33ff66]T[/]           FOLLOW-UP LEDGER — overdue · today · upcoming · open reg · quiet sponsors
+              · future call-backs. enter jumps to the row · space marks done · t reschedules
+  [#33ff66]t[/]           set a follow-up DATE on the selected study or lead
+              (9/15 · +7 · +2w · mon · 2026-09-15 · blank clears) — works on the deck,
+              the board, the reg board and the leads screen
   [#33ff66]g / esc[/]     menu — filters · connections · models · site  (esc again quits)
 
 [b #ffb000]PIPELINE   (set the selected study's stage)[/]
@@ -44,7 +55,10 @@ HELP_TEXT = """\
   [#33ff66]c[/]   Wintermute — full-screen chat about this study
   [#33ff66]m[/]   draft outreach to the PI  ([#ffb000]o[/] in the draft opens it in your mail client)
   [#33ff66]e[/]   edit notes on this study
-  [#33ff66]R[/]   reg handoff — startup checklist for a won study (CDA → 1572 → IRB → CTA → SIV)
+  [#33ff66]R[/]   reg handoff — the startup checklist, grouped by phase (deck · board · G · L · T)
+      space done · [#33ff66]-[/] N/A (doesn't apply, counts as complete) · a ad-hoc item ·
+      e note on an item · d drop an ad-hoc item · p print. Dates stamp themselves.
+      Template: profile.toml → regulatory.phases (item text is the key — rename = restart)
 
 [b #ffb000]SPONSOR DOSSIERS  (press S)[/]
   One row per sponsor: their book of trials, contacts deduped across NCTs,
@@ -130,14 +144,18 @@ class NotesModal(ModalScreen):
 
     BINDINGS = [("escape", "cancel", "cancel")]
 
-    def __init__(self, current: str = ""):
+    def __init__(self, current: str = "", title: str = "NOTES",
+                 placeholder: str = "e.g. emailed coordinator 6/30…"):
         super().__init__()
         self._current = current
+        self._title = title
+        self._placeholder = placeholder
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-box", classes="modal"):
-            yield Static(Text.from_markup("NOTES — enter to save, esc to cancel"), classes="modal-title")
-            yield Input(value=self._current, placeholder="e.g. emailed coordinator 6/30…", id="notes-input")
+            yield Static(Text.from_markup(f"{self._title} — enter to save, esc to cancel"),
+                         classes="modal-title")
+            yield Input(value=self._current, placeholder=self._placeholder, id="notes-input")
 
     def on_mount(self) -> None:
         self.query_one(Input).focus()

@@ -45,6 +45,10 @@ class MainScreen(Screen):
         Binding("s", "sort", "sort", show=False),
         Binding("b", "briefing", "briefing", show=False),
         Binding("R", "reg", "reg handoff", show=False),
+        Binding("G", "regboard", "regulatory", show=False),   # v1.9.0
+        Binding("L", "leads", "leads", show=False),           # v1.9.0
+        Binding("T", "followup", "follow-up", show=False),    # v1.9.0
+        Binding("t", "due", "follow-up date", show=False),    # v1.9.0
         Binding("S", "sponsors", "sponsors"),
         Binding("e", "notes", "notes", show=False),
         Binding("g", "settings", "menu", show=False),
@@ -78,6 +82,8 @@ class MainScreen(Screen):
         self.current_id: str | None = None
         self.stale: set[str] = set()
         self.show_stale = False
+        self.due: dict[str, str] = {}                 # v1.9.0 — study_id → iso date
+        self.reg_progress: dict[str, tuple[int, int]] = {}
 
     _SORT_KEYS = ("start", "status", "phase", "enrollment", "sites", "contact",
                   "sponsor", "stage", "title")
@@ -161,6 +167,11 @@ class MainScreen(Screen):
             self.stale = self.engine.store.stale_ids()
         except Exception:
             self.stale = set()
+        try:
+            self.due = self.engine.due_map()
+            self.reg_progress = self.engine.reg_progress_map()
+        except Exception:
+            self.due, self.reg_progress = {}, {}
         self.apply_filter()
         self.update_topbar()
 
@@ -206,7 +217,13 @@ class MainScreen(Screen):
         if not sid or sid not in self.by_id:
             return
         study, stage, notes = self.by_id[sid]
-        self.query_one("#detail", Static).update(detail_view(study, stage, notes))
+        reg = None
+        if sid in self.reg_progress:
+            done, total = self.reg_progress[sid]
+            from .. import regulatory as _reg
+            reg = (done, total, _reg.next_open(self.engine.reg_detail(sid)))
+        self.query_one("#detail", Static).update(
+            detail_view(study, stage, notes, due=self.due.get(sid, ""), reg=reg))
         wm = self.wm_pane
         if wm:
             wm.set_study(study, notes)
@@ -259,6 +276,14 @@ class MainScreen(Screen):
             due = 0
         nudge = (f"   [#ffb000]⏰ {due} sponsor{'s' if due != 1 else ''} quiet (b)[/]"
                  if due else "")
+        try:
+            from datetime import date as _date
+            today = _date.today().isoformat()
+            pressing = sum(1 for d in self.due.values() if d <= today)
+        except Exception:
+            pressing = 0
+        if pressing:
+            nudge += f"   [#ff5555]⏰ {pressing} follow-up{'s' if pressing != 1 else ''} due (T)[/]"
         stale = ""
         if self.stale:
             stale = (f"   [#ffb000]stale shown (a hides)[/]" if self.show_stale
@@ -291,6 +316,10 @@ class MainScreen(Screen):
             new = STAGE_KEYS[event.key]
             self.engine.set_stage(study.id, new)
             self.by_id[study.id] = (study, new, notes)
+            try:   # v1.9.0 — a promote into MEETING/WON/CONDUCTING starts its reg clock
+                self.reg_progress = self.engine.reg_progress_map()
+            except Exception:
+                pass
             self.apply_filter()
             self.flash(f"{study.nct} → {new.label}"
                        + ("  ·  now on the PIPELINE board (K)" if new not in (Stage.NEW,) else ""),
@@ -345,7 +374,7 @@ class MainScreen(Screen):
         from datetime import date
         b = self.engine.briefing()
         if auto and not (b["new_count"] or b["flips"] or b["quiet"] or b["meetings"]
-                         or b["reg"] or b.get("future")):
+                         or b["reg"] or b.get("future") or b.get("due")):
             return  # nothing to say — don't interrupt
         self.engine.store.set_meta("last_briefing_date", date.today().isoformat())
 
@@ -354,6 +383,16 @@ class MainScreen(Screen):
         def line(s: str, style: str = "#33ff66") -> None:
             t.append(s + "\n", style=style)
 
+        if b.get("due"):
+            line("⏰ FOLLOW-UPS DUE  (t set them · T the ledger)", "bold #ff5555")
+            from ..followup import due_label
+            for study, _st, _n, due in b["due"]:
+                label, _c = due_label(due)
+                line(f"   {label:<11} {study.nct} · {study.title[:34]} · {study.sponsor[:20]}")
+            for study, _st, _n, due in b.get("due_soon", []):
+                label, _c = due_label(due)
+                line(f"   {label:<11} {study.nct} · {study.title[:34]}", "#33ff66")
+            line("")
         if b["new_count"]:
             line(f"◆ {b['new_count']} new trials in your net since last visit", "#00ff88")
             for d in b["known_new"]:
@@ -382,6 +421,11 @@ class MainScreen(Screen):
 
         line("\n▶ TODAY'S TOP 3", "bold #ffb000")
         n = 1
+        for study, _st, _n2, due in b.get("due", []):
+            if n > 3:
+                break
+            line(f"   {n}. FOLLOW UP — {study.nct} · {study.title[:30]} (due {due})")
+            n += 1
         for study, _st, _n2 in b["meetings"]:
             if n > 3:
                 break
@@ -401,7 +445,7 @@ class MainScreen(Screen):
             line("   deck's empty — press r to search ClinicalTrials.gov", "#1f9e46")
 
         t.append("\n")
-        line("b reopens this · S sponsors · K kanban", "dim")
+        line("b reopens this · S sponsors · K kanban · T follow-up · G regulatory · L leads", "dim")
         self.app.push_screen(TextModal("[#ffb000 b]MORNING BRIEFING · BD INTEL[/]", t, amber=True))
 
     # ---- actions ---- #
@@ -418,6 +462,42 @@ class MainScreen(Screen):
                 color = "#00ff88" if done == total else "#ffb000"
                 self.flash(f"reg handoff · {study.nct} · {done}/{total} done", color)
         self.app.push_screen(RegModal(self.engine, study), closed)
+
+    # ---- v1.9.0: regulatory board · leads · follow-up ---- #
+    def action_regboard(self) -> None:
+        from .regboard import RegBoardScreen
+        self.app.push_screen(RegBoardScreen(self.engine), lambda _=None: self.reload())
+
+    def action_leads(self) -> None:
+        from .leads import LeadsScreen
+        self.app.push_screen(LeadsScreen(self.engine), lambda _=None: self.reload())
+
+    def action_followup(self) -> None:
+        from .followup_screen import FollowupScreen
+        self.app.push_screen(FollowupScreen(self.engine), self.landed_from_followup)
+
+    def landed_from_followup(self, sid=None) -> None:
+        """Back from the ledger: reload, and land the cursor on the chosen row."""
+        self.reload()
+        if not sid:
+            return
+        self.current_id = sid
+        if sid in self.stale and not self.show_stale:
+            self.show_stale = True
+        self.apply_filter()
+        for i, (study, _st, _n) in enumerate(self.view):
+            if study.id == sid:
+                self.query_one("#listings", DataTable).move_cursor(row=i)
+                self.flash(f"{study.nct} — from the follow-up ledger", "#ffb000")
+                return
+
+    def action_due(self) -> None:
+        sel = self.selected()
+        if not sel:
+            self.flash("no study selected — move the cursor first", "#ffb000")
+            return
+        from .followup_screen import ask_due
+        ask_due(self, self.engine, sel[0], self.reload)
 
     def action_sort(self) -> None:
         from .sorting import STUDY_SORTS, SortModal

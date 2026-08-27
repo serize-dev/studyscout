@@ -60,6 +60,10 @@ KANBAN_ORDER = [
     Stage.DECLINED, Stage.UNFIT, Stage.UNAVAILABLE, Stage.CLOSED,
 ]
 
+# Off-registry leads (v1.9.0): synthetic ids so they share the studies table.
+LEAD_PREFIX = "LEAD-"
+LEAD_STATUS = "LEAD"
+
 # Sponsor classes worth weighting for BD (industry = paying customers).
 SPONSOR_CLASS_LABEL = {
     "INDUSTRY": "industry", "NIH": "NIH", "FED": "federal",
@@ -113,6 +117,7 @@ class Study:
     sites: list[Site] = field(default_factory=list)
     central_contacts: list[Contact] = field(default_factory=list)
     summary: str = ""
+    link: str = ""                         # off-registry leads: their URL (if any)
 
     # ---- derived / scored ---- #
     fit: int = 0
@@ -120,7 +125,15 @@ class Study:
     llm_scored: bool = False
 
     @property
+    def is_lead(self) -> bool:
+        """v1.9.0 — an off-registry prospect you typed in (no NCT): a PI, a
+        program, an act, a network. Rides the whole pipeline like a study."""
+        return self.nct.startswith(LEAD_PREFIX)
+
+    @property
     def url(self) -> str:
+        if self.is_lead:
+            return self.link or ""
         return f"https://clinicaltrials.gov/study/{self.nct}"
 
     @property

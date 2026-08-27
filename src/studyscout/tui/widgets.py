@@ -23,6 +23,7 @@ _STATUS_SHORT = {
     "SUSPENDED": ("Susp", "#ff5555"),
     "TERMINATED": ("Term", "#ff5555"),
     "WITHDRAWN": ("Wdrn", "#ff5555"),
+    "LEAD": ("Lead", "#b58cff"),        # v1.9.0 — off-registry prospect
 }
 
 
@@ -61,13 +62,22 @@ def title_cell(study: Study) -> Text:
     return t
 
 
-def detail_view(study: Study, stage: Stage, notes: str) -> Text:
+def detail_view(study: Study, stage: Stage, notes: str, due: str = "",
+                reg: tuple | None = None) -> Text:
+    """The study text. `due` = ISO follow-up date; `reg` = (done, total, next_item)."""
     t = Text()
     t.append(study.title + "\n", style="bold #ffb000")
-    t.append(study.nct, style="#33ccff underline")
-    t.append(f"   {study.phase_str}", style="bold #33ff88")
-    t.append(f"   {study.status_short}", style=_STATUS_SHORT.get(study.status, ('', '#2bbf5a'))[1])
-    t.append(f"   n={study.enrollment}   {study.n_sites} sites\n", style="#33ff66")
+    if study.is_lead:
+        t.append(study.nct, style="#b58cff")
+        t.append("   OFF-REGISTRY LEAD", style="bold #b58cff")
+        if study.study_type and study.study_type != "LEAD":
+            t.append(f"   {study.study_type}", style="#33ff66")
+        t.append("\n")
+    else:
+        t.append(study.nct, style="#33ccff underline")
+        t.append(f"   {study.phase_str}", style="bold #33ff88")
+        t.append(f"   {study.status_short}", style=_STATUS_SHORT.get(study.status, ('', '#2bbf5a'))[1])
+        t.append(f"   n={study.enrollment}   {study.n_sites} sites\n", style="#33ff66")
 
     t.append("\nsponsor  ", style="#1f9e46")
     t.append(study.sponsor or "—", style="bold #00ff88")
@@ -83,6 +93,17 @@ def detail_view(study: Study, stage: Stage, notes: str) -> Text:
     if study.start:
         t.append("start    ", style="#1f9e46")
         t.append(f"{study.start.isoformat()}\n", style="#33ff66")
+    if due:
+        from ..followup import due_label
+        label, color = due_label(due)
+        t.append("follow-up", style="#1f9e46")
+        t.append(f"  {due}  ", style="#aaffcc")
+        t.append(f"{label}\n", style=f"bold {color}")
+    if reg:
+        done, total, nxt = reg
+        t.append("reg      ", style="#1f9e46")
+        t.append(f"▤ {done}/{total}", style="bold #00ff88" if done == total else "bold #ffb000")
+        t.append(f"  next: {nxt}\n" if nxt else "  activated\n", style="#33ff66")
 
     # Contacts — the outreach targets.
     best = study.best_contact()
@@ -105,8 +126,9 @@ def detail_view(study: Study, stage: Stage, notes: str) -> Text:
         if study.n_sites > 8:
             t.append(f"  … +{study.n_sites - 8} more\n", style="#1f9e46")
 
-    t.append("\nlink     ", style="#1f9e46")
-    t.append(study.url + "\n", style="#33ccff underline")
+    if study.url:
+        t.append("\nlink     ", style="#1f9e46")
+        t.append(study.url + "\n", style="#33ccff underline")
     if notes:
         t.append("notes    ", style="#1f9e46")
         t.append(notes + "\n", style="#ffb000")

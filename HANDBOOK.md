@@ -1,5 +1,5 @@
 # STUDY//SCOUT — THE HANDBOOK
-### v1.7.0 · the definitive manual
+### v1.9.0 · the definitive manual
 
 A phosphor-green terminal for clinical-trials business development. It hunts
 ClinicalTrials.gov for studies that fit your site, groups them into **sponsor
@@ -112,8 +112,53 @@ the whole ocean — `studyscout doctor` will call it out.
   account/mailbox.
 - **`b` — morning briefing:** what changed since yesterday (deltas), sponsors
   gone quiet (`followup.nudge_days`), and today's top three.
-- **`R` — reg handoff:** after a WIN, the CDA→SIV paperwork checklist
-  (edit the template in `regulatory.checklist`). The briefing nags open items.
+- **`R` — reg handoff:** the startup paperwork checklist, **grouped by
+  phase** since v1.9.0 (FEASIBILITY → REG DOCS → IRB → CONTRACTS →
+  ACTIVATION). `space` checks an item off (it stamps its own date), **`-`
+  marks it N/A** (doesn't apply to this study — no 1572 on a non-IND device
+  trial — and counts as complete), `a` adds an ad-hoc item for this study
+  only, `e` notes an item ("IRB reviewer asked for X"), `d` drops an ad-hoc
+  item, `p` prints. The title shows the startup-day clock. Works on the
+  deck, the pipeline board, the regulatory board, the leads screen and the
+  follow-up ledger. Edit the template in `profile.toml → regulatory.phases`
+  (item text is the key the checked state hangs on — rename = start over;
+  a customized v1.x flat `regulatory.checklist` is auto-sorted into phases
+  by keyword, so upgrades don't lose anything).
+- **`G` — REGULATORY board** (also in the menu): the startup gauntlet as a
+  second board. Columns are the phases plus ACTIVATED; **nothing is dragged
+  — a study sits in the first phase that still has an open item and moves
+  itself as you check things off.** Cards show `▤ done/total`, the startup
+  day count (amber past 60) and the next open item. `enter`/`R` opens the
+  checklist right there, **`C` promotes to CONDUCTING** (the handoff from
+  paperwork to the live book — it stays on the board while items are open),
+  `t` sets a follow-up, `p`/`P` print. Studies land here once they hit
+  MEETING / WON / CONDUCTING on the pipeline; pipeline cards show the same
+  `▤` progress. The briefing nags open items.
+- **`L` — LEADS** (also in the menu): off-registry prospects. Not everything
+  worth chasing has an NCT — a PI you met, a state genetics program, an act
+  with grant money behind it, a network that said "call us". `a` adds one
+  (title, organization, contact, link, topics, kind, starting stage, a
+  follow-up date, and free text Wintermute reads); `enter` edits; `d` drops
+  (with a confirm — leads are the only thing Scout ever deletes). A lead
+  gets a `LEAD-####` id and lives in the **same store as the studies**, so
+  it rides everything with zero special cases: the stage digits, the `K`
+  board, the `S` dossier (grouped by organization — a lead for Acme joins
+  Acme's dossier next to their NCTs), `e` notes, `m` outreach (Wintermute
+  is told it's off-registry and must not invent trial details), `c` chat,
+  `R` reg, `t`/`T` follow-up. Leads show on the deck as `Lead` status and
+  are never "stale" — searches don't touch them.
+- **`t` / `T` — FOLLOW-UP, the tickle file** (also in the menu): `t` on any
+  study or lead (deck · board · reg board · leads) sets a date — forgiving
+  entry: `9/15`, `+7`, `+2w`, `+1m`, `mon`, `tomorrow`, `2026-09-15`, blank
+  clears. `T` opens the ledger: **OVERDUE → DUE TODAY → UPCOMING (next
+  `followup.due_horizon_days`, default 14) → LATER**, then the un-dated
+  pressure Scout already tracked — open reg paperwork, quiet sponsors,
+  FUTURE call-backs due. `enter` jumps to that row on the deck, `space`
+  marks a follow-up done (clears the date — `t` sets the next one), `t`
+  reschedules, `R` works the checklist, `p` prints. Due dates ride the
+  detail pane and the board cards (`⏰ overdue 3d` in red); the status bar
+  counts what's due; the briefing leads with them and puts them at the top
+  of TODAY'S TOP 3.
 - **`s`** sorts (same key flips direction) — or **click any column header**
   on the deck or in the zoom table; clicking the same header flips.
 - **`z`** on the studies list opens the **full table** — every column (NCT,

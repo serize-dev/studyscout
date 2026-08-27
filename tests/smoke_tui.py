@@ -1,6 +1,7 @@
 """Headless TUI smoke test — boots every screen incl. sponsors + sort modal."""
 
 import asyncio
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -8,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from studyscout.engine import Engine                       # noqa: E402
-from studyscout.models import Contact, Site, Study         # noqa: E402
+from studyscout.models import Contact, Site, Stage, Study  # noqa: E402
 from studyscout.tui.app import StudyScoutApp              # noqa: E402
 from studyscout.tui.launcher import LauncherScreen         # noqa: E402
 from studyscout.tui.main_screen import MainScreen          # noqa: E402
@@ -127,7 +128,7 @@ async def main() -> None:
         app.save_screenshot("/tmp/sf_reg.svg")
         await pilot.press("space"); await pilot.pause(0.1)   # check off item 1
         reg = app.screen
-        assert sum(1 for _i, d in reg.items if d) == 1
+        assert sum(1 for it in reg.items if it.complete) == 1   # v1.9.0: RegItem
         study_id = reg.study.id
         await pilot.press("escape"); await pilot.pause(0.2)
         assert isinstance(app.screen, MainScreen)
@@ -424,6 +425,191 @@ async def main() -> None:
         assert MainScreen(eng)._load_sort() == ("enrollment", False)  # no saved sort → filters choice
         scr.set_sort("sites", False)                        # leave the deck multi-site first
 
+
+        # ================= v1.9.0 — REGULATORY board · LEADS · FOLLOW-UP =================
+        from studyscout import regulatory as _reg
+        from studyscout.tui.launcher import BUTTONS
+        from studyscout.tui.leads import LeadForm, LeadsScreen
+        from studyscout.tui.followup_screen import FollowupScreen
+        from studyscout.tui.reg import RegModal
+        from studyscout.tui.regboard import RegBoardScreen
+        from studyscout.tui.modals import ConfirmModal, NotesModal
+        from textual.widgets import Input as _Input, TextArea as _TextArea
+        assert {"reg", "leads", "followup"} <= {b for b, _l in BUTTONS}
+        scr = app.screen
+        scr.query_one("#listings").focus(); await pilot.pause(0.1)
+        scr.query_one("#listings").move_cursor(row=0); await pilot.pause(0.1)
+        won_id = scr.current_id
+        await pilot.press("6"); await pilot.pause(0.2)          # WON → reg-eligible
+        assert scr.by_id[won_id][1] == Stage.WON
+        assert won_id in scr.reg_progress                        # deck knows its progress
+        assert "reg" in str(scr.query_one("#detail").render())  # detail shows ▤ line
+
+        # G — the regulatory board: study lands in the FIRST phase with an open item
+        await pilot.press("G"); await pilot.pause(0.5)
+        assert isinstance(app.screen, RegBoardScreen), type(app.screen).__name__
+        rb = app.screen
+        assert rb.cols[0] == "FEASIBILITY" and rb.cols[-1] == _reg.ACTIVATED, rb.cols
+        assert any(c["study"].id == won_id for c in rb.cards["FEASIBILITY"]), rb.cards
+        app.save_screenshot("/tmp/sf_regboard.svg")
+        # enter → checklist (phased); `-` = N/A; `a` adds an ad-hoc item; `e` notes it; `d` drops it
+        await pilot.press("enter"); await pilot.pause(0.3)
+        assert isinstance(app.screen, RegModal)
+        rm = app.screen
+        assert rm.items[0].phase == "FEASIBILITY" and rm.items[4].phase == "REG DOCS", \
+            [(i.item, i.phase) for i in rm.items[:6]]
+        cur = rm.items[rm.cursor]
+        await pilot.press("minus"); await pilot.pause(0.1)
+        assert rm.items[rm.cursor].done == _reg.NA and rm.items[rm.cursor].complete
+        await pilot.press("minus"); await pilot.pause(0.1)      # back to open
+        assert rm.items[rm.cursor].done == _reg.OPEN
+        await pilot.press("a"); await pilot.pause(0.2)
+        assert isinstance(app.screen, NotesModal)
+        app.screen.query_one(_Input).value = "Radiation safety committee sign-off"
+        await pilot.press("enter"); await pilot.pause(0.2)
+        assert rm.items[-1].custom and rm.items[-1].item.startswith("Radiation")
+        await pilot.press("e"); await pilot.pause(0.2)
+        app.screen.query_one(_Input).value = "asked Dr. K on 8/27"
+        await pilot.press("enter"); await pilot.pause(0.2)
+        assert rm.items[-1].note == "asked Dr. K on 8/27"
+        assert "asked Dr. K" in str(rm.query_one("#reg-list").render())
+        await pilot.press("p"); await pilot.pause(0.3)          # print the checklist
+        assert isinstance(app.screen, TextModal) and "Radiation" in app.screen._body
+        assert list(Path(os.environ["STUDYSCOUT_DATA"]).glob("reg-nct*.txt"))
+        await pilot.press("escape"); await pilot.pause(0.2)
+        await pilot.press("d"); await pilot.pause(0.1)          # drop the ad-hoc item
+        assert not any(i.custom for i in rm.items)
+        await pilot.press("escape"); await pilot.pause(0.3)
+        assert isinstance(app.screen, RegBoardScreen)
+        # derivation: complete FEASIBILITY → the card moves itself to REG DOCS
+        for it in [i for i in eng.reg_detail(won_id) if i.phase == "FEASIBILITY"]:
+            if not it.complete:
+                eng.reg_set(won_id, it.item, _reg.DONE)
+        await rb._rebuild(); await pilot.pause(0.2)
+        assert any(c["study"].id == won_id for c in rb.cards["REG DOCS"]), \
+            {k: [c["study"].nct for c in v] for k, v in rb.cards.items()}
+        # C → CONDUCTING, still on the board while paperwork is open
+        rb.col = rb.cols.index("REG DOCS"); rb.sel = 0; rb._restyle()
+        await pilot.press("C"); await pilot.pause(0.3)
+        assert dict((s.id, st) for s, st, _n in eng.load())[won_id] == Stage.CONDUCTING
+        assert any(c["study"].id == won_id for c in rb.cards["REG DOCS"])
+        rb.action_print_board(); await pilot.pause(0.3)
+        assert isinstance(app.screen, TextModal) and "REG DOCS" in app.screen._body
+        await pilot.press("escape"); await pilot.pause(0.2)
+        await pilot.press("escape"); await pilot.pause(0.3)
+        assert isinstance(app.screen, MainScreen)
+
+        # kanban tie-in: card shows ▤ progress; R opens the checklist; t sets a follow-up
+        await pilot.press("K"); await pilot.pause(0.4)
+        kb = app.screen
+        kb.col = BOARD_ORDER.index(Stage.CONDUCTING); kb.sel = 0; kb._restyle()
+        card = [w for w in kb.query_one(f"#list-{Stage.CONDUCTING.value}").children
+                if "kcard" in w.classes][0]
+        assert "▤" in str(card.render())
+        await pilot.press("R"); await pilot.pause(0.3)
+        assert isinstance(app.screen, RegModal)
+        await pilot.press("escape"); await pilot.pause(0.3)
+        assert isinstance(app.screen, KanbanScreen)
+        await pilot.press("t"); await pilot.pause(0.2)
+        assert isinstance(app.screen, NotesModal)
+        app.screen.query_one(_Input).value = "+7"
+        await pilot.press("enter"); await pilot.pause(0.3)
+        assert won_id in eng.due_map()
+        card = [w for w in kb.query_one(f"#list-{Stage.CONDUCTING.value}").children
+                if "kcard" in w.classes][0]
+        assert "⏰" in str(card.render())
+        await pilot.press("escape"); await pilot.pause(0.3)
+        assert isinstance(app.screen, MainScreen)
+
+        # L — LEADS: add via the form, edit, stage digit, due date, delete
+        await pilot.press("L"); await pilot.pause(0.4)
+        assert isinstance(app.screen, LeadsScreen), type(app.screen).__name__
+        ls = app.screen
+        assert "No leads yet" in str(ls.query_one("#detail").render())
+        await pilot.press("a"); await pilot.pause(0.3)
+        assert isinstance(app.screen, LeadForm)
+        lf = app.screen
+        lf.query_one("#lf-title", _Input).value = "Sunshine Genetics Act — PI outreach"
+        lf.query_one("#lf-sponsor", _Input).value = "State Genetics Program"
+        lf.query_one("#lf-name", _Input).value = "Dr. Sol"
+        lf.query_one("#lf-email", _Input).value = "sol@state.test"
+        lf.query_one("#lf-topics", _Input).value = "newborn screening, genetics"
+        lf.query_one("#lf-due", _Input).value = "+3"
+        lf.query_one("#lf-summary", _TextArea).text = "Met at the conference; wants site partners."
+        app.save_screenshot("/tmp/sf_leadform.svg")
+        await pilot.press("ctrl+s"); await pilot.pause(0.4)
+        assert isinstance(app.screen, LeadsScreen)
+        leads = eng.leads()
+        assert len(leads) == 1 and leads[0][0].nct == "LEAD-0001" and leads[0][1] == Stage.FLAGGED
+        lead = leads[0][0]
+        assert lead.is_lead and lead.sponsor == "State Genetics Program" and lead.url == ""
+        assert lead.best_contact().email == "sol@state.test" and lead.conditions == ["newborn screening", "genetics"]
+        assert lead.id in eng.due_map()
+        assert "State Genetics Program" in {d.name for d in eng.dossiers()}   # dossier by org
+        assert not eng.store.deltas_since("2000-01-01T00:00:00", limit=200) or all(
+            d["nct"] != "LEAD-0001" for d in eng.store.deltas_since("2000-01-01T00:00:00", limit=200))
+        app.save_screenshot("/tmp/sf_leads.svg")
+        # edit: enter → form prefilled → change title
+        await pilot.press("enter"); await pilot.pause(0.3)
+        assert isinstance(app.screen, LeadForm)
+        assert app.screen.query_one("#lf-title", _Input).value.startswith("Sunshine")
+        app.screen.query_one("#lf-title", _Input).value = "Sunshine Genetics Act — PI (Dr. Sol)"
+        await pilot.press("ctrl+s"); await pilot.pause(0.4)
+        assert eng.leads()[0][0].title.endswith("(Dr. Sol)") and eng.leads()[0][0].nct == "LEAD-0001"
+        await pilot.press("2"); await pilot.pause(0.3)          # stage digit → CONTACTED
+        assert eng.leads()[0][1] == Stage.CONTACTED
+        await pilot.press("t"); await pilot.pause(0.2)
+        app.screen.query_one(_Input).value = "garbage"
+        await pilot.press("enter"); await pilot.pause(0.2)      # rejected, modal closes
+        assert eng.due_map()[lead.id] != "garbage"
+        # a second lead, then drop it
+        await pilot.press("a"); await pilot.pause(0.3)
+        app.screen.query_one("#lf-title", _Input).value = "typo lead"
+        await pilot.press("ctrl+s"); await pilot.pause(0.4)
+        assert len(eng.leads()) == 2
+        ls.current_id = eng.leads()[1][0].id if eng.leads()[1][0].title == "typo lead" else eng.leads()[0][0].id
+        await pilot.press("d"); await pilot.pause(0.2)
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.press("y"); await pilot.pause(0.3)
+        assert len(eng.leads()) == 1 and eng.leads()[0][0].nct == "LEAD-0001"
+        await pilot.press("p"); await pilot.pause(0.3)
+        assert isinstance(app.screen, TextModal) and "LEAD-0001" in app.screen._body
+        await pilot.press("escape"); await pilot.pause(0.2)
+        await pilot.press("escape"); await pilot.pause(0.3)
+        assert isinstance(app.screen, MainScreen)
+        scr = app.screen
+        assert lead.id in scr.by_id                              # leads ride the deck
+        eng.store.set_meta("last_search_at", "2999-01-01T00:00:00")
+        assert lead.id not in eng.store.stale_ids()              # …and are never stale
+        eng.store.set_meta("last_search_at", "")
+
+        # T — FOLLOW-UP ledger: dated rows, space = done, enter = jump to the deck row
+        from datetime import date as _date, timedelta as _td
+        eng.set_due(won_id, (_date.today() - _td(days=2)).isoformat())   # overdue
+        scr.reload(); await pilot.pause(0.2)
+        assert "follow-up" in str(scr.query_one("#statusbar").render())
+        b = eng.briefing()
+        assert b["due"] and b["due"][0][0].id == won_id, b["due"]
+        await pilot.press("T"); await pilot.pause(0.4)
+        assert isinstance(app.screen, FollowupScreen), type(app.screen).__name__
+        fu = app.screen
+        assert len(fu.ledger.overdue) == 1 and fu.ledger.overdue[0][0].id == won_id
+        assert any(r[0].id == lead.id for r in fu.ledger.upcoming)
+        assert fu.ledger.reg and fu.ledger.reg[0][0].id == won_id
+        app.save_screenshot("/tmp/sf_followup.svg")
+        await pilot.press("p"); await pilot.pause(0.3)
+        assert isinstance(app.screen, TextModal) and "OVERDUE" in app.screen._body
+        await pilot.press("escape"); await pilot.pause(0.2)
+        await pilot.press("space"); await pilot.pause(0.3)      # overdue one → done
+        assert won_id not in eng.due_map() and not fu.ledger.overdue
+        await pilot.press("j"); await pilot.pause(0.1)
+        fu.sel = 0
+        await pilot.press("enter"); await pilot.pause(0.4)      # jump to the lead on the deck
+        assert isinstance(app.screen, MainScreen) and app.screen.current_id == lead.id
+        # restore for the blocks that follow
+        eng.set_stage(won_id, Stage.NEW); eng.set_due(lead.id, None)
+        app.screen.reload(); await pilot.pause(0.2)
+
         # MODELS: provider radio rebuilds the model radio list live
         from studyscout.tui.models_screen import CATALOG, ModelsScreen
         msn = ModelsScreen(eng)
@@ -442,7 +628,6 @@ async def main() -> None:
 
     # ---- doctor + backup/restore (headless, offline) ------------------------
     import io
-    import os
     import tarfile
 
     from studyscout import backup as bx

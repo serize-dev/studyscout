@@ -87,6 +87,20 @@ def _study_context(study: Optional[Study], notes: str = "") -> str:
         return "No study selected."
     c = study.best_contact()
     sites = "; ".join(f"{s.facility} ({s.where()})" for s in study.sites[:6]) or "—"
+    if study.is_lead:
+        # v1.9.0 — an off-registry prospect: no NCT, no registry record. Never
+        # invent trial details; work from what the operator typed.
+        return (
+            f"SELECTED LEAD (off-registry prospect — NOT a ClinicalTrials.gov record; "
+            f"there is no NCT number, do not invent one):\n"
+            f"  {study.nct} — {study.title}\n"
+            f"  Organization: {study.sponsor or '?'} [{study.sponsor_class or '?'}]\n"
+            f"  Topics: {', '.join(study.conditions[:8]) or '—'}\n"
+            f"  Contact: {c.render()}\n"
+            + (f"  Link: {study.link}\n" if study.link else "")
+            + f"  Your notes: {notes or '(none)'}\n"
+            f"  What you know: {(study.summary or '')[:1600]}"
+        )
     return (
         f"SELECTED STUDY:\n"
         f"  {study.nct} — {study.title}\n"

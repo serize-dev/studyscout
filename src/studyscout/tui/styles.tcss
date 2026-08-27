@@ -263,3 +263,25 @@ RadioSet > RadioButton.-selected { background: #103018; }
 #filters-buttons Button { width: 1fr; margin: 0 1 0 0; }
 SelectionList { color: #33ff66; }
 SelectionList > .selection-list--option-highlighted { background: #103018; }
+
+/* ---- v1.9.0: leads form · follow-up ledger ------------------------- */
+#lead-box {
+    width: 104; max-width: 96%; height: 92%;
+    border: double #b58cff; background: #04150a; padding: 1 2;
+}
+#lead-scroll { height: 1fr; }
+#lead-grid {
+    layout: grid; grid-size: 2; grid-columns: 1fr; grid-rows: auto;
+    height: auto; grid-gutter: 0 1;
+}
+.lead-field { width: 1fr; height: auto; padding: 0 1 0 0; }
+#lead-radios { height: auto; }
+#lf-summary { height: 7; }
+#lead-buttons { height: 3; }
+#lead-buttons Button { width: 1fr; margin: 0 1 0 0; }
+/* reg board columns are mounted dynamically — 1fr resolves to full width there,
+   so they get a fixed width (the pipeline board's static compose keeps 1fr). */
+#regboard { height: 1fr; overflow-x: auto; }
+#regboard .kcol { width: 40; }
+#fu-box { height: 1fr; border: double #1f9e46; padding: 0 1; }
+#fu-scroll { height: 1fr; }

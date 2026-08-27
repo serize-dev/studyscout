@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .config import data_dir
-from .models import Contact, Site, Stage, Study, parse_date
+from .models import LEAD_PREFIX, Contact, Site, Stage, Study, parse_date
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS studies (
@@ -65,20 +65,33 @@ class Store:
                 self.con.execute(f"ALTER TABLE sponsors ADD COLUMN {col}")
             except sqlite3.OperationalError:
                 pass
+        # v1.9.0 migrations: off-registry leads carry their own link; any row
+        # can carry a dated follow-up; checklist items can carry a note.
+        for table, col in (("studies", "link TEXT"), ("pipeline", "due TEXT"),
+                           ("reg", "note TEXT")):
+            try:
+                self.con.execute(f"ALTER TABLE {table} ADD COLUMN {col}")
+            except sqlite3.OperationalError:
+                pass
         self.con.commit()
 
     def close(self):
         self.con.close()
 
     # ---- write ---- #
-    def upsert(self, studies: Iterable[Study], stamp: str | None = None) -> int:
+    def upsert(self, studies: Iterable[Study], stamp: str | None = None,
+               quiet: bool = False) -> int:
+        """Persist studies. `quiet` skips the delta feed (hand-entered leads
+        are not 'new trials in your net')."""
         now = stamp or datetime.now().isoformat(timespec="seconds")
         new = 0
         cur = self.con.cursor()
         for s in studies:
             exists = cur.execute("SELECT status FROM studies WHERE id=?", (s.id,)).fetchone()
             # Delta intel: a brand-new trial or a status flip is the BD trigger.
-            if not exists:
+            if quiet or s.is_lead:
+                pass
+            elif not exists:
                 cur.execute(
                     "INSERT INTO deltas (ts,study_id,nct,sponsor,kind,detail) VALUES (?,?,?,?,?,?)",
                     (now, s.id, s.nct, s.sponsor, "new", s.status))
@@ -90,22 +103,22 @@ class Store:
             cur.execute(
                 """INSERT INTO studies (id,nct,title,status,phases,conditions,sponsor,
                    sponsor_class,collaborators,enrollment,study_type,start,sites,
-                   central_contacts,summary,first_seen,last_seen)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(id) DO UPDATE SET status=excluded.status,
+                   central_contacts,summary,first_seen,last_seen,link)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(id) DO UPDATE SET title=excluded.title, status=excluded.status,
                    phases=excluded.phases, conditions=excluded.conditions,
                    sponsor=excluded.sponsor, sponsor_class=excluded.sponsor_class,
                    collaborators=excluded.collaborators, enrollment=excluded.enrollment,
                    study_type=excluded.study_type, start=excluded.start, sites=excluded.sites,
                    central_contacts=excluded.central_contacts, summary=excluded.summary,
-                   last_seen=excluded.last_seen""",
+                   last_seen=excluded.last_seen, link=excluded.link""",
                 (s.id, s.nct, s.title, s.status, json.dumps(s.phases),
                  json.dumps(s.conditions), s.sponsor, s.sponsor_class,
                  json.dumps(s.collaborators), s.enrollment, s.study_type,
                  s.start.isoformat() if s.start else None,
                  json.dumps([asdict(x) for x in s.sites]),
                  json.dumps([asdict(c) for c in s.central_contacts]),
-                 s.summary, now, now),
+                 s.summary, now, now, s.link or ""),
             )
             if not exists:
                 cur.execute("INSERT OR IGNORE INTO pipeline (study_id,stage,updated_at) VALUES (?,?,?)",
@@ -141,6 +154,41 @@ class Store:
             (study_id, notes, Stage.NEW.value, now))
         self.con.commit()
 
+    # ---- v1.9.0: off-registry leads ---- #
+    def next_lead_nct(self) -> str:
+        """LEAD-0001, LEAD-0002, … — a synthetic id so a lead shares the
+        studies table (and therefore every screen) with real NCTs."""
+        n = int(self.get_meta("lead_seq", "0") or 0) + 1
+        self.set_meta("lead_seq", str(n))
+        return f"{LEAD_PREFIX}{n:04d}"
+
+    def delete_study(self, study_id: str) -> None:
+        """Hard delete — leads only in practice (a typo'd prospect). NCT rows
+        would just come back on the next search anyway."""
+        for table in ("pipeline", "reg", "studies"):
+            self.con.execute(f"DELETE FROM {table} WHERE {'study_id' if table != 'studies' else 'id'}=?",
+                             (study_id,))
+        self.con.commit()
+
+    # ---- v1.9.0: dated follow-ups (the tickle file) ---- #
+    def set_due(self, study_id: str, due: str | None) -> None:
+        """due = ISO date or None to clear. Creates the pipeline row if needed."""
+        now = datetime.now().isoformat(timespec="seconds")
+        self.con.execute(
+            "INSERT INTO pipeline (study_id,stage,due,updated_at) VALUES (?,?,?,?) "
+            "ON CONFLICT(study_id) DO UPDATE SET due=excluded.due",
+            (study_id, Stage.NEW.value, due, now))
+        self.con.commit()
+
+    def due_map(self) -> dict[str, str]:
+        return {r["study_id"]: r["due"] for r in self.con.execute(
+            "SELECT study_id, due FROM pipeline WHERE due IS NOT NULL AND due != ''")}
+
+    def stage_stamps(self) -> dict[str, str]:
+        """study_id → when it entered its current stage (pipeline.updated_at)."""
+        return {r["study_id"]: r["updated_at"] or "" for r in self.con.execute(
+            "SELECT study_id, updated_at FROM pipeline")}
+
     # ---- read ---- #
     def _row(self, r: sqlite3.Row) -> Study:
         sites = []
@@ -157,6 +205,7 @@ class Store:
             start=parse_date(r["start"]), sites=sites,
             central_contacts=[Contact(**c) for c in json.loads(r["central_contacts"] or "[]")],
             summary=r["summary"] or "",
+            link=(r["link"] if "link" in r.keys() else "") or "",
         )
 
     def studies_with_stage(self) -> list[tuple[Study, Stage, str]]:
@@ -185,8 +234,9 @@ class Store:
             return set()
         rows = self.con.execute(
             """SELECT s.id FROM studies s JOIN pipeline p ON p.study_id = s.id
-               WHERE p.stage = 'new' AND COALESCE(s.last_seen, '') < ?""",
-            (last,)).fetchall()
+               WHERE p.stage = 'new' AND COALESCE(s.last_seen, '') < ?
+                 AND s.nct NOT LIKE ?""",
+            (last, LEAD_PREFIX + "%")).fetchall()
         return {r["id"] for r in rows}
 
     def get_meta(self, key: str, default: str = "") -> str:
@@ -266,27 +316,64 @@ class Store:
         return int(r["n"] or 0), int(r["r"] or 0), [s["subject"] for s in subs]
 
     # ---- regulatory handoff checklist ---- #
-    def reg_state(self, study_id: str, template: list[str]) -> list[tuple[str, bool]]:
-        """Checklist in template order; custom items already checked off for a
+    # done: 0 open · 1 done · 2 N/A (v1.9.0 — doesn't apply to this study,
+    # e.g. no 1572 on a non-IND device trial). N/A counts as complete.
+    def reg_state(self, study_id: str, template: list[str]) -> list[tuple[str, int]]:
+        """Checklist in template order; custom items already recorded for a
         study survive template edits (they're appended at the end)."""
-        rows = {r["item"]: bool(r["done"]) for r in self.con.execute(
+        rows = {r["item"]: int(r["done"] or 0) for r in self.con.execute(
             "SELECT item, done FROM reg WHERE study_id=?", (study_id,))}
-        out = [(item, rows.pop(item, False)) for item in template]
+        out = [(item, rows.pop(item, 0)) for item in template]
         out += [(item, done) for item, done in rows.items()]   # legacy/custom items
         return out
 
-    def reg_toggle(self, study_id: str, item: str) -> bool:
+    def reg_rows(self, study_id: str) -> dict[str, dict]:
+        """item → {done, note, updated_at} for everything recorded on a study."""
+        return {r["item"]: {"done": int(r["done"] or 0), "note": r["note"] or "",
+                            "updated_at": r["updated_at"] or ""}
+                for r in self.con.execute(
+                    "SELECT item, done, note, updated_at FROM reg WHERE study_id=?", (study_id,))}
+
+    def reg_all(self) -> dict[str, dict[str, int]]:
+        """study_id → {item: done} in one query (the boards need every study)."""
+        out: dict[str, dict[str, int]] = {}
+        for r in self.con.execute("SELECT study_id, item, done FROM reg"):
+            out.setdefault(r["study_id"], {})[r["item"]] = int(r["done"] or 0)
+        return out
+
+    def reg_set(self, study_id: str, item: str, done: int) -> int:
         now = datetime.now().isoformat(timespec="seconds")
-        r = self.con.execute("SELECT done FROM reg WHERE study_id=? AND item=?",
-                             (study_id, item)).fetchone()
-        new = 0 if (r and r["done"]) else 1
         self.con.execute(
             "INSERT INTO reg (study_id,item,done,updated_at) VALUES (?,?,?,?) "
             "ON CONFLICT(study_id,item) DO UPDATE SET done=excluded.done, "
             "updated_at=excluded.updated_at",
-            (study_id, item, new, now))
+            (study_id, item, int(done), now))
         self.con.commit()
-        return bool(new)
+        return int(done)
+
+    def reg_toggle(self, study_id: str, item: str) -> bool:
+        r = self.con.execute("SELECT done FROM reg WHERE study_id=? AND item=?",
+                             (study_id, item)).fetchone()
+        new = 0 if (r and r["done"]) else 1
+        return bool(self.reg_set(study_id, item, new))
+
+    def reg_note(self, study_id: str, item: str, note: str) -> None:
+        now = datetime.now().isoformat(timespec="seconds")
+        self.con.execute(
+            "INSERT INTO reg (study_id,item,done,note,updated_at) VALUES (?,?,0,?,?) "
+            "ON CONFLICT(study_id,item) DO UPDATE SET note=excluded.note",
+            (study_id, item, note, now))
+        self.con.commit()
+
+    def reg_delete_item(self, study_id: str, item: str) -> None:
+        self.con.execute("DELETE FROM reg WHERE study_id=? AND item=?", (study_id, item))
+        self.con.commit()
+
+    def reg_started(self, study_id: str) -> str:
+        """When startup began: the first checklist touch, else ''."""
+        r = self.con.execute("SELECT MIN(updated_at) t FROM reg WHERE study_id=?",
+                             (study_id,)).fetchone()
+        return (r["t"] if r else "") or ""
 
     # ---- sponsors (the BD relationship layer) ---- #
     def sponsor_notes_map(self) -> dict[str, str]:

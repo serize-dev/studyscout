@@ -73,22 +73,45 @@ DEFAULTS: dict[str, Any] = {
         # FUTURE-stage relationships parked this many days → "reach back out"
         # nudge in the briefing. The keep-warm clock.
         "future_nudge_days": 45,
+        # Dated follow-ups (`t` on a study/lead) within this many days show as
+        # UPCOMING in the FOLLOW-UP ledger (`T`); overdue + today always show.
+        "due_horizon_days": 14,
     },
     # Site-startup handoff: the paperwork gauntlet after a study is won.
-    # Press R on a study to work the list; edit these items to match your SOP.
+    # Press R on a study (or G for the REGULATORY board) to work the list;
+    # edit these phases/items to match your SOP. Item text is the key that
+    # checked-off state hangs on — rename an item and it starts over.
     "regulatory": {
-        "checklist": [
-            "CDA / NDA signed",
-            "Feasibility questionnaire returned",
-            "Protocol + IB received",
-            "FDA 1572 completed",
-            "PI CV + medical license current",
-            "GCP / human-subjects certs current",
-            "IRB / EC submission",
-            "Budget negotiated",
-            "CTA executed",
-            "Delegation-of-authority log started",
-            "SIV scheduled",
+        "phases": [
+            {"name": "FEASIBILITY", "items": [
+                "CDA / NDA signed",
+                "Feasibility questionnaire returned",
+                "Protocol + IB received",
+                "Site qualification visit (PSV) done",
+            ]},
+            {"name": "REG DOCS", "items": [
+                "FDA 1572 completed",
+                "PI CV + medical license current",
+                "GCP / human-subjects certs current",
+                "Financial disclosure forms signed",
+                "Lab certs (CLIA/CAP) + normal ranges on file",
+                "Protocol signature page signed",
+            ]},
+            {"name": "IRB", "items": [
+                "IRB / EC submission",
+                "IRB approval received",
+                "Consent form approved (final)",
+            ]},
+            {"name": "CONTRACTS", "items": [
+                "Budget negotiated",
+                "CTA executed",
+            ]},
+            {"name": "ACTIVATION", "items": [
+                "Delegation-of-authority log started",
+                "Pharmacy / IP storage confirmed",
+                "SIV scheduled",
+                "Site activation letter received",
+            ]},
         ],
     },
     "ai": {

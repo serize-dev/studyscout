@@ -44,6 +44,8 @@ class KanbanScreen(Screen):
         ("a", "toggle_all", "all/filtered"),
         ("p", "print_column", "print col"),
         ("P", "print_board", "print board"),
+        ("R", "reg", "reg checklist"),        # v1.9.0 — the regulatory tie-in
+        ("t", "due", "follow-up"),            # v1.9.0 — the tickle file
     ]
 
     def __init__(self, engine, text_filter: str = ""):
@@ -56,6 +58,8 @@ class KanbanScreen(Screen):
         # v1.4.1 — the board inherits the deck's / filter; `a` lifts it
         self.text_filter = (text_filter or "").strip()
         self.show_all = not self.text_filter
+        self.reg_progress: dict = {}     # study_id → (done, total)  (v1.9.0)
+        self.due: dict = {}              # study_id → iso date        (v1.9.0)
 
     def compose(self) -> ComposeResult:
         yield Static(id="topbar")
@@ -80,7 +84,7 @@ class KanbanScreen(Screen):
         self.query_one("#topbar", Static).update(Text.from_markup(
             "[b #33ff88]STUDY//SCOUT · PIPELINE BOARD[/]" + flt + empty + "   "
             "[dim]h/l column · j/k card · 1-9 stage · C conducting · x not-accepting · [#ffb000]0/u → inbox[/] · "
-            "p/P print col/board · o open · esc back[/]"))
+            "R reg · t follow-up · p/P print · o open · esc back[/]"))
 
     def _match(self, study) -> bool:
         if self.show_all or not self.text_filter:
@@ -99,6 +103,11 @@ class KanbanScreen(Screen):
     # ---- data → widgets ---------------------------------------------------- #
     async def _rebuild(self) -> None:
         rows = self.engine.load()
+        try:
+            self.reg_progress = self.engine.reg_progress_map()
+            self.due = self.engine.due_map()
+        except Exception:
+            self.reg_progress, self.due = {}, {}
         self.board = {st: [] for st in self.cols}
         for study, stage, notes in rows:
             if stage in self.board and self._match(study):
@@ -134,9 +143,18 @@ class KanbanScreen(Screen):
     def _card_text(self, study, notes, selected: bool) -> Text:
         t = Text()
         t.append("› " if selected else "  ", style="bold #ffb000")
-        t.append(f"{study.nct[-8:]}", style="#33ccff")
-        t.append(f" {study.phase_str[:6]}", style="#33ff88")
+        t.append(f"{study.nct[-8:]}", style="#b58cff" if study.is_lead else "#33ccff")
+        t.append(" lead" if study.is_lead else f" {study.phase_str[:6]}", style="#33ff88")
         t.append(" @" if study.has_contact else "  ", style="#00ff88")
+        prog = self.reg_progress.get(study.id)
+        if prog:
+            done, total = prog
+            t.append(f" ▤{done}/{total}", style="#00ff88" if done == total else "#ffb000")
+        due = self.due.get(study.id)
+        if due:
+            from ..followup import due_label
+            label, color = due_label(due)
+            t.append(f" ⏰{label}", style=f"bold {color}")
         t.append("\n")
         t.append(("  " + study.title[:64]), style="#aaffcc" if selected else "#33ff66")
         t.append("\n")
@@ -227,32 +245,41 @@ class KanbanScreen(Screen):
                     lines.append(f"  contact: {contact.render()}")
                 if notes:
                     lines.append(f"  notes:   {notes}")
-                lines.append(f"  {study.url}")
+                if study.url:
+                    lines.append(f"  {study.url}")
         lines.append("")
         return "\n".join(lines)
 
     def _export(self, cols, scope: str) -> None:
-        from datetime import datetime
-
-        from ..config import data_dir
-        text = self._export_text(cols)
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        path = data_dir() / f"pipeline-{scope}-{stamp}.txt"
-        try:
-            path.write_text(text, encoding="utf-8")
-            saved = f"saved → {path}"
-        except Exception as exc:  # noqa: BLE001
-            saved = f"save failed: {exc}"
-        from .modals import TextModal
-        title = f"PRINT · {scope.upper()}  [dim]· c copy · saved to disk — print with: lp {path.name}[/]"
-        self.app.push_screen(TextModal(title, text, copyable=True))
-        self.notify(saved, severity="information")
+        from .export import export_text
+        export_text(self.app, scope, self._export_text(cols), prefix="pipeline")
 
     def action_print_column(self) -> None:
         self._export([self.cols[self.col]], self.cols[self.col].value)
 
     def action_print_board(self) -> None:
         self._export(list(self.cols), "board")
+
+    def action_reg(self) -> None:
+        s = self._current()
+        if not s:
+            return
+        from .reg import RegModal
+
+        async def closed(res):
+            if res:
+                done, total = res
+                self.notify(f"reg handoff · {s.nct} · {done}/{total}"
+                            + ("  · activated — C marks it CONDUCTING" if done == total else ""),
+                            severity="information")
+            await self._rebuild()
+        self.app.push_screen(RegModal(self.engine, s), closed)
+
+    def action_due(self) -> None:
+        s = self._current()
+        if s:
+            from .followup_screen import ask_due
+            ask_due(self, self.engine, s, lambda: self.call_later(self._rebuild))
 
     async def on_key(self, event) -> None:
         if event.key in MOVE_KEYS:

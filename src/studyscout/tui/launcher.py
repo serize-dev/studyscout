@@ -17,6 +17,9 @@ BUTTONS = [
     ("jack", "▶  JACK IN — open the deck"),
     ("sponsors", "⊞  SPONSORS — dossier view (the BD lens)"),
     ("kanban", "▦  PIPELINE — kanban board (worked stages)"),
+    ("reg", "▤  REGULATORY — startup board: CDA → IRB → CTA → SIV, per-study checklists"),
+    ("leads", "◎  LEADS — off-registry prospects (no NCT): PIs, programs, acts, networks"),
+    ("followup", "⏰  FOLLOW-UP — the tickle file: dated call-backs, quiet sponsors, open reg"),
     ("filters", "◇  FILTERS — search settings (age, phase, US/intl, site count…)"),
     ("search", "⟲  SEARCH NOW — query ClinicalTrials"),
     ("conn", "⌁  CONNECTIONS — API key"),
@@ -82,6 +85,22 @@ class LauncherScreen(ModalScreen):
             tf = next((scr.text_filter for scr in reversed(self.app.screen_stack)
                        if isinstance(scr, MainScreen)), "")
             self.app.push_screen(KanbanScreen(self.engine, text_filter=tf))
+        elif bid == "reg":
+            self.dismiss()
+            from .regboard import RegBoardScreen
+            self.app.push_screen(RegBoardScreen(self.engine))
+        elif bid == "leads":
+            self.dismiss()
+            from .leads import LeadsScreen
+            self.app.push_screen(LeadsScreen(self.engine))
+        elif bid == "followup":
+            self.dismiss()
+            from .followup_screen import FollowupScreen
+            from .main_screen import MainScreen
+            main = next((scr for scr in reversed(self.app.screen_stack)
+                         if isinstance(scr, MainScreen)), None)
+            self.app.push_screen(FollowupScreen(self.engine),
+                                 (main.landed_from_followup if main else None))
         elif bid == "filters":
             def done(run):
                 if run:

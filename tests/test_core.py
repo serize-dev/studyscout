@@ -208,6 +208,117 @@ def main() -> None:
     assert d0.in_pipeline == 1, d0.in_pipeline
     print("conducting aliveness OK")
 
+
+    # ================= v1.9.0 — reg phases · leads · follow-up =================
+    from datetime import date as _date
+    from studyscout import regulatory as R
+    from studyscout.followup import build_ledger, due_label, parse_due
+    from studyscout.config import DEFAULTS
+
+    # parse_due: forgiving entry
+    t0 = _date(2026, 8, 27)
+    assert parse_due("9/15", t0) == _date(2026, 9, 15)
+    assert parse_due("+7", t0) == _date(2026, 9, 3) and parse_due("+2w", t0) == _date(2026, 9, 10)
+    assert parse_due("mon", t0) == _date(2026, 8, 31) and parse_due("tomorrow", t0) == _date(2026, 8, 28)
+    assert parse_due("1/5", t0) == _date(2027, 1, 5)          # rolls into next year
+    assert parse_due("2026-09-15", t0) == _date(2026, 9, 15) and parse_due("", t0) is None
+    try:
+        parse_due("garbage", t0); raise AssertionError("garbage accepted")
+    except ValueError:
+        pass
+    assert due_label((t0 - timedelta(days=3)).isoformat(), t0)[0] == "overdue 3d"
+    assert due_label(t0.isoformat(), t0)[0] == "today"
+    assert due_label((t0 + timedelta(days=5)).isoformat(), t0)[0] == "in 5d"
+    print("parse_due OK")
+
+    # resolve_phases precedence: default → legacy-untouched → customized legacy → custom phases
+    defaults = DEFAULTS["regulatory"]["phases"]
+    class _Cfg:
+        def __init__(self, d): self.d = d
+        def get(self, k, default=None): return self.d.get(k, default)
+    ph = R.resolve_phases(_Cfg({}), defaults)
+    assert [n for n, _i in ph] == ["FEASIBILITY", "REG DOCS", "IRB", "CONTRACTS", "ACTIVATION"]
+    assert R.resolve_phases(_Cfg({"regulatory.checklist": list(R.LEGACY_CHECKLIST)}), defaults) == ph
+    custom_flat = ["CDA signed", "IRB approval", "SIV booked", "Weird local thing"]
+    ph2 = R.resolve_phases(_Cfg({"regulatory.checklist": custom_flat,
+                                 "regulatory.phases": defaults}), defaults)
+    assert dict(ph2) == {"FEASIBILITY": ["CDA signed"], "IRB": ["IRB approval"],
+                         "ACTIVATION": ["SIV booked"], "OTHER": ["Weird local thing"]}, ph2
+    ph3 = R.resolve_phases(_Cfg({"regulatory.checklist": custom_flat,
+                                 "regulatory.phases": [{"name": "ONE", "items": ["a", "b"]}]}), defaults)
+    assert ph3 == [("ONE", ["a", "b"])], ph3
+    # derivation: N/A counts complete; column = first phase with an open item
+    items = R.build_items(ph3, {"a": {"done": R.NA}, "zzz": {"done": R.OPEN}})
+    assert R.column_of(items, ph3) == "ONE" and R.progress(items) == (1, 3)
+    assert items[-1].custom and items[-1].phase == "OTHER"
+    items = R.build_items(ph3, {"a": {"done": R.NA}, "b": {"done": R.DONE}})
+    assert R.column_of(items, ph3) == R.ACTIVATED and R.next_open(items) == ""
+    assert R.board_columns(ph3, has_other=True) == ["ONE", "OTHER", R.ACTIVATED]
+    print("reg phases OK")
+
+    # engine: reg_progress_map only covers reg stages; N/A + notes round-trip
+    won = _studies()[1].id
+    e.set_stage(won, Stage.WON)
+    pm = e.reg_progress_map()
+    assert won in pm and pm[won][1] == len(e.reg_items()) and _studies()[2].id not in pm
+    e.reg_set(won, "FDA 1572 completed", R.NA)
+    e.reg_note(won, "FDA 1572 completed", "non-IND device — n/a")
+    d = {i.item: i for i in e.reg_detail(won)}
+    assert d["FDA 1572 completed"].done == R.NA and d["FDA 1572 completed"].note.startswith("non-IND")
+    assert e.reg_progress(won)[0] == 1
+    e.reg_add_item(won, "Local radiation committee")
+    assert any(i.custom and i.item == "Local radiation committee" for i in e.reg_detail(won))
+    e.reg_delete_item(won, "Local radiation committee")
+    assert not any(i.custom for i in e.reg_detail(won))
+    cols, cards = e.reg_board()
+    assert cols[-1] == R.ACTIVATED and any(c["study"].id == won for c in cards["FEASIBILITY"])
+    assert e.reg_started_days(won) is not None
+    print("reg engine OK")
+
+    # leads: quiet upsert (no delta), dossier grouping, edit keeps id, delete
+    before = len(e.store.deltas_since("2000-01-01T00:00:00", limit=500))
+    acme_n = {d.name: d for d in e.dossiers()}["Acme Pharma"].n_trials
+    lead = e.save_lead({"title": "Sunshine Genetics Act — PI", "sponsor": "Acme Pharma",
+                        "sponsor_class": "INDUSTRY", "contact": {"name": "Dr. Sol", "email": "sol@x.test"},
+                        "topics": ["genetics"], "summary": "met at conf", "link": "https://x.test"},
+                       stage=Stage.FLAGGED, due="2026-09-15")
+    assert lead.nct == "LEAD-0001" and lead.is_lead and lead.url == "https://x.test"
+    assert len(e.store.deltas_since("2000-01-01T00:00:00", limit=500)) == before   # no delta noise
+    assert e.due_map()[lead.id] == "2026-09-15"
+    acme = {d.name: d for d in e.dossiers()}["Acme Pharma"]
+    assert acme.n_trials == acme_n + 1 and any(s.is_lead for s, _st, _n in acme.rows)  # joins the dossier
+    lead2 = e.save_lead({"title": "Sunshine Genetics Act — PI (edited)", "sponsor": "Acme Pharma"},
+                        nct=lead.nct)
+    assert lead2.id == lead.id and e.leads()[0][0].title.endswith("(edited)")
+    assert e.leads()[0][1] == Stage.FLAGGED                       # stage untouched on edit
+    e.store.set_meta("last_search_at", "2999-01-01T00:00:00")
+    assert lead.id not in e.store.stale_ids()
+    e.store.set_meta("last_search_at", "")
+    from studyscout.ai.consigliere import _study_context
+    ctx = _study_context(lead2, "call Tuesday")
+    assert "off-registry" in ctx and "do not invent" in ctx and "LEAD-0001" in ctx
+    e.delete_lead(lead.id)
+    assert not e.leads() and lead.id not in e.due_map()
+    assert e.store.next_lead_nct() == "LEAD-0002"                  # sequence never reuses
+    print("leads OK")
+
+    # ledger buckets
+    ss = _studies()
+    rows = [(ss[0], Stage.CONTACTED, ""), (ss[1], Stage.WON, "n"), (ss[2], Stage.FLAGGED, "")]
+    due = {ss[0].id: (t0 - timedelta(days=1)).isoformat(), ss[1].id: t0.isoformat(),
+           ss[2].id: (t0 + timedelta(days=30)).isoformat()}
+    led = build_ledger(rows, due, quiet=[("Q", 9, 1)], future=[], reg=[], horizon=14, today=t0)
+    assert [r[0].id for r in led.overdue] == [ss[0].id] and [r[0].id for r in led.today] == [ss[1].id]
+    assert not led.upcoming and [r[0].id for r in led.later] == [ss[2].id] and led.pressing == 2
+    led2 = e.ledger()
+    assert isinstance(led2.horizon, int) and led2.reg and led2.reg[0][0].id == won
+    e.set_due(won, (_date.today() - timedelta(days=1)).isoformat())
+    b4 = e.briefing()
+    assert b4["due"] and b4["due"][0][0].id == won and len(b4["due"][0]) == 4
+    e.set_due(won, None)
+    assert won not in e.due_map()
+    print("ledger OK")
+
     print("\nALL GREEN")
 
 
