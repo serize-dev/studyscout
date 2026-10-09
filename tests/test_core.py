@@ -196,6 +196,27 @@ def main() -> None:
         ok, msg = _mail.open_mail("a@b.c", "S", "B", mode="outlook")
         assert ok and calls[-1][0] == "xdg-open" and "deeplink" in calls[-1][1]
     print("mail routing OK ·", len(calls), "launches intercepted")
+    # v1.9.1 — frozen binary must not leak its _MEI lib dir into the browser
+    from studyscout.childenv import child_env
+    mei = "/tmp/_MEIabc123"
+    leaky = {"LD_LIBRARY_PATH": mei + ":/opt/x/lib", "LD_LIBRARY_PATH_ORIG": "/opt/x/lib",
+             "PATH": "/usr/bin", "GI_TYPELIB_PATH": mei + "/gi", "HOME": "/h"}
+    env = child_env(leaky, bundle_dir=mei)
+    assert env["LD_LIBRARY_PATH"] == "/opt/x/lib", env
+    assert "LD_LIBRARY_PATH_ORIG" not in env and "GI_TYPELIB_PATH" not in env, env
+    assert env["PATH"] == "/usr/bin" and env["HOME"] == "/h"
+    env = child_env({"LD_LIBRARY_PATH": mei, "LD_LIBRARY_PATH_ORIG": ""}, bundle_dir=mei)
+    assert "LD_LIBRARY_PATH" not in env, env           # user had none → none
+    env = child_env({"LD_LIBRARY_PATH": mei + ":/usr/lib"}, bundle_dir=mei)
+    assert env["LD_LIBRARY_PATH"] == "/usr/lib", env   # no ORIG → strip bundle entry
+    assert child_env({"LD_LIBRARY_PATH": "/a"}, bundle_dir="") == {"LD_LIBRARY_PATH": "/a"}
+    kw_seen = []
+    with _mock.patch.object(_mail.subprocess, "Popen",
+                            lambda argv, **kw: kw_seen.append(kw)), \
+         _mock.patch.object(_mail.shutil, "which", lambda x: "/usr/bin/" + x):
+        _mail.open_mail("a@b.c", "S", "B")
+    assert "env" in kw_seen[-1], kw_seen
+    print("child env scrub OK")
 
     # v1.7.0 — dossier aliveness: CONDUCTING counts, UNAVAILABLE doesn't
     from studyscout.models import SponsorDossier

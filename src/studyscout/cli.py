@@ -82,6 +82,8 @@ def _where() -> int:
 
 
 def main(argv=None) -> int:
+    from .childenv import scrub_environ
+    scrub_environ()            # frozen binary: don't leak bundled libs into the browser
     argv = argv if argv is not None else sys.argv[1:]
     cmd = argv[0] if argv else "tui"
     if cmd in ("-h", "--help", "help"):

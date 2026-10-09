@@ -8,6 +8,8 @@ import shutil
 import subprocess
 from urllib.parse import quote
 
+from .childenv import child_env
+
 
 def split_draft(draft: str, fallback_subject: str = "") -> tuple[str, str]:
     """Split a Wintermute draft into (subject, body).
@@ -82,7 +84,8 @@ def open_mail(to: str | None, subject: str, body: str, command: str = "",
             continue
         try:
             final = argv + [url] if append_url else argv
-            subprocess.Popen(final, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(final, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             env=child_env())
             where = argv[0] + (" (Outlook Web compose)" if mode == "outlook" else "")
             return True, f"opened in {where}"
         except Exception as exc:  # noqa: BLE001
